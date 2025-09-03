@@ -1,21 +1,21 @@
-import { useMemo, useState } from "react";
-import {
-  View,
-  Text,
-  TouchableOpacity,
-  StyleSheet,
-  Modal,
-  Pressable,
-} from "react-native";
+import AppointmentCalendar from "@/components/appointments/AppointmentCalendar";
+import AppointmentList from "@/components/appointments/AppointmentList";
 import {
   Appointment,
-  mockAppointments,
   COLORS,
   codeColor,
   formatDateTimeRange,
+  mockAppointments,
 } from "@/components/appointments/types";
-import AppointmentList from "@/components/appointments/AppointmentList";
-import AppointmentCalendar from "@/components/appointments/AppointmentCalendar";
+import { useMemo, useState } from "react";
+import {
+  Modal,
+  Pressable,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from "react-native";
 
 type Tab = "list" | "calendar";
 

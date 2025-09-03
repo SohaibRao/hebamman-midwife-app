@@ -1,9 +1,9 @@
 import React, { useMemo, useState } from "react";
-import { Dimensions, View, StyleSheet, Text , TouchableOpacity } from "react-native";
+import { Dimensions, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { Calendar } from "react-native-big-calendar";
 // Note: Avoid importing CalendarEvent as a type due to conflicts
-import { Appointment, COLORS, codeColor, formatTime } from "./types";
 import { addMonths, format, isSameMonth, startOfMonth } from "date-fns";
+import { Appointment, COLORS, codeColor, formatTime } from "./types";
 
 // We extend the event shape with our own payload
 type RNEvent = {

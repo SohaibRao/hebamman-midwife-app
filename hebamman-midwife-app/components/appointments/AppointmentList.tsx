@@ -1,6 +1,6 @@
 import React, { useMemo } from "react";
-import { SectionList, View, Text, StyleSheet, TouchableOpacity } from "react-native";
-import { Appointment, COLORS, codeColor, formatTime, groupByDay } from "./types";
+import { SectionList, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { Appointment, codeColor, formatTime, groupByDay } from "./types";
 
 export default function AppointmentList({
   appointments,

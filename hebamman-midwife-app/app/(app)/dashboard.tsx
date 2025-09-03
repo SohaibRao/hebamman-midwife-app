@@ -1,13 +1,26 @@
-import { Link } from "expo-router";
-import { useMemo } from "react";
-import {
-  ScrollView,
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-} from "react-native";
 import { useAuth } from "@/context/AuthContext";
+import { Link } from "expo-router";
+import React from "react";
+import {
+  Modal,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from "react-native";
+
+// ---- Leads hook & helpers ----
+import { Lead, leadAddress, leadDisplayDate, useLeads } from "@/hooks/useLeads";
+
+// ---- Appointments helpers (reuse the list look & feel) ----
+import {
+  Appointment as Appt,
+  codeColor,
+  formatTime,
+  mockAppointments,
+} from "@/components/appointments/types";
 
 const COLORS = {
   bg: "#F6F8F7",
@@ -16,18 +29,12 @@ const COLORS = {
   dim: "#5C6B63",
   accent: "#2E5A49", // CTA green
   sage: "#7F9086",
-  badgePending: "#EAB308",   // amber-ish
-  badgeDone: "#22C55E",      // green
-  badgeGray: "#9CA3AF",      // gray
+  badgePending: "#EAB308",
+  badgeDone: "#22C55E",
+  badgeGray: "#9CA3AF",
 };
 
-type Appointment = {
-  id: string;
-  patientName: string;
-  serviceName: string;
-  startISO: string; // e.g. "2025-09-05T10:30:00Z"
-};
-
+// Keep your requests mock for now
 type RequestItem = {
   id: string;
   patientName: string;
@@ -35,16 +42,6 @@ type RequestItem = {
   status: "pending" | "completed";
   createdISO: string;
 };
-
-// ---------- TEMP MOCK DATA (replace with API later) ----------
-const MOCK_APPOINTMENTS: Appointment[] = [
-  { id: "a1", patientName: "Anna Müller",    serviceName: "Vorsorge",    startISO: "2025-09-02T08:30:00Z" },
-  { id: "a2", patientName: "Lea Schneider",  serviceName: "Wochenbett",  startISO: "2025-09-02T10:00:00Z" },
-  { id: "a3", patientName: "Mia Weber",      serviceName: "Geburtsvor.", startISO: "2025-09-03T12:15:00Z" },
-  { id: "a4", patientName: "Emma Fischer",   serviceName: "Stillberatung",startISO:"2025-09-03T14:00:00Z" },
-  { id: "a5", patientName: "Sofia Becker",   serviceName: "Vorsorge",    startISO: "2025-09-04T09:00:00Z" },
-  { id: "a6", patientName: "Nora Wagner",    serviceName: "Nachsorge",   startISO: "2025-09-04T11:30:00Z" },
-];
 
 const MOCK_REQUESTS: RequestItem[] = [
   { id: "r1", patientName: "Anna Müller",   requestType: "reschedule", status: "pending",   createdISO: "2025-09-01T09:10:00Z" },
@@ -54,39 +51,41 @@ const MOCK_REQUESTS: RequestItem[] = [
   { id: "r5", patientName: "Sofia Becker",  requestType: "cancel",     status: "pending",   createdISO: "2025-09-01T05:00:00Z" },
   { id: "r6", patientName: "Nora Wagner",   requestType: "reschedule", status: "completed", createdISO: "2025-08-31T17:20:00Z" },
 ];
-// ------------------------------------------------------------
 
-const formatDateTime = (iso: string) => {
-  const d = new Date(iso);
-  // keep it simple and locale-friendly
-  return d.toLocaleString(undefined, {
+const formatDate = (iso: string) =>
+  new Date(iso).toLocaleDateString(undefined, {
     weekday: "short",
     day: "2-digit",
     month: "short",
-    hour: "2-digit",
-    minute: "2-digit",
   });
-};
 
 export default function Dashboard() {
   const { user } = useAuth();
 
-  const activePatientsCount = 18; // placeholder — replace with API count later
-  const upcoming5 = useMemo(
+  // ---- Leads (for the logged-in midwife) ----
+  const { upcoming, loading: leadsLoading } = useLeads(user?.id);
+  const [selectedLead, setSelectedLead] = React.useState<Lead | null>(null);
+  const upcomingLeads5 = React.useMemo(() => upcoming.slice(0, 5), [upcoming]);
+
+  // ---- Appointments: latest 5 (from our appointments module mock for now) ----
+  const upcomingApp5: Appt[] = React.useMemo(
     () =>
-      [...MOCK_APPOINTMENTS]
+      [...mockAppointments]
         .sort((a, b) => +new Date(a.startISO) - +new Date(b.startISO))
         .slice(0, 5),
     []
   );
 
-  const requests5 = useMemo(
+  // ---- Requests: latest 5 (keep your mock) ----
+  const requests5 = React.useMemo(
     () =>
       [...MOCK_REQUESTS]
         .sort((a, b) => +new Date(b.createdISO) - +new Date(a.createdISO))
         .slice(0, 5),
     []
   );
+
+  const activePatientsCount = 18; // placeholder — swap with API later
 
   return (
     <ScrollView style={{ flex: 1, backgroundColor: COLORS.bg }} contentContainerStyle={{ padding: 16 }}>
@@ -102,32 +101,74 @@ export default function Dashboard() {
         <Text style={styles.statValue}>{activePatientsCount}</Text>
       </View>
 
-      {/* Upcoming Appointments */}
-      <SectionHeader title="Upcoming Appointments" action={
-        <Link href={{ pathname: "/(app)/appointments" } as any} asChild>
-          <TouchableOpacity style={styles.linkBtn}><Text style={styles.linkBtnText}>See all appointments</Text></TouchableOpacity>
-        </Link>
-      } />
-
+      {/* A1/A2 Consultation (Leads) */}
+      <SectionHeader
+        title="A1/A2 Consultation (Leads)"
+        action={
+          <Link href={{ pathname: "/(app)/leads" } as any} asChild>
+            <TouchableOpacity style={styles.linkBtn}><Text style={styles.linkBtnText}>See all leads</Text></TouchableOpacity>
+          </Link>
+        }
+      />
       <View style={styles.listCard}>
-        {upcoming5.map((a, i) => (
+        {leadsLoading && <Text style={{ color: COLORS.dim }}>Loading…</Text>}
+        {!leadsLoading && upcomingLeads5.length === 0 && (
+          <Text style={{ color: COLORS.dim }}>No upcoming leads.</Text>
+        )}
+        {!leadsLoading &&
+          upcomingLeads5.map((lead, i) => (
+            <Pressable
+              key={lead._id}
+              onPress={() => setSelectedLead(lead)}
+              style={[styles.row, i > 0 && styles.rowDivider]}
+            >
+              <View style={{ flex: 1 }}>
+                <Text style={styles.rowTitle}>{lead.fullName}</Text>
+                <Text style={styles.rowSub}>{lead.email} · {lead.phoneNumber}</Text>
+                <Text style={styles.rowSubSmall}>{leadAddress(lead)}</Text>
+              </View>
+              <View style={{ alignItems: "flex-end" }}>
+                <Text style={styles.when}>{leadDisplayDate(lead)}</Text>
+                <Text style={styles.slot}>{lead.selectedSlot ?? "—"}</Text>
+              </View>
+            </Pressable>
+          ))}
+      </View>
+
+      {/* Upcoming Appointments (use the new list-row style; latest 5) */}
+      <SectionHeader
+        title="Upcoming Appointments"
+        action={
+          <Link href={{ pathname: "/(app)/appointments" } as any} asChild>
+            <TouchableOpacity style={styles.linkBtn}><Text style={styles.linkBtnText}>See all appointments</Text></TouchableOpacity>
+          </Link>
+        }
+      />
+      <View style={styles.listCard}>
+        {upcomingApp5.map((a, i) => (
           <View key={a.id} style={[styles.row, i > 0 && styles.rowDivider]}>
+            <View style={[styles.dot, { backgroundColor: codeColor(a.serviceCode) }]} />
             <View style={{ flex: 1 }}>
-              <Text style={styles.rowTitle}>{a.patientName}</Text>
-              <Text style={styles.rowSub}>{a.serviceName}</Text>
+              <Text style={styles.rowTitle}>{a.serviceCode} - {a.title}</Text>
+              <Text style={styles.rowSub}>{a.patientName} ({a.patientShort})</Text>
             </View>
-            <Text style={styles.when}>{formatDateTime(a.startISO)}</Text>
+            <View style={{ alignItems: "flex-end" }}>
+              <Text style={styles.when}>{formatDate(a.startISO)}</Text>
+              <Text style={styles.slot}>{formatTime(a.startISO)} · {a.durationMin}m</Text>
+            </View>
           </View>
         ))}
       </View>
 
-      {/* Requests from Patients */}
-      <SectionHeader title="Requests from Patients" action={
-        <Link href={{ pathname: "/(app)/requests" } as any} asChild>
-          <TouchableOpacity style={styles.linkBtn}><Text style={styles.linkBtnText}>See more requests</Text></TouchableOpacity>
-        </Link>
-      } />
-
+      {/* Requests from Patients (unchanged) */}
+      <SectionHeader
+        title="Requests from Patients"
+        action={
+          <Link href={{ pathname: "/(app)/requests" } as any} asChild>
+            <TouchableOpacity style={styles.linkBtn}><Text style={styles.linkBtnText}>See more requests</Text></TouchableOpacity>
+          </Link>
+        }
+      />
       <View style={styles.listCard}>
         {requests5.map((r, i) => (
           <View key={r.id} style={[styles.row, i > 0 && styles.rowDivider]}>
@@ -151,6 +192,30 @@ export default function Dashboard() {
           </View>
         ))}
       </View>
+
+      {/* Lead details modal */}
+      {selectedLead && (
+        <Modal visible transparent animationType="fade" onRequestClose={() => setSelectedLead(null)}>
+          <Pressable style={styles.overlay} onPress={() => setSelectedLead(null)}>
+            <Pressable style={styles.modalCard}>
+              <View style={styles.modalHeader}>
+                <Text style={styles.modalTitle}>Lead Details</Text>
+                <TouchableOpacity onPress={() => setSelectedLead(null)}>
+                  <Text style={{ fontWeight: "700", color: COLORS.dim }}>✕</Text>
+                </TouchableOpacity>
+              </View>
+              <Detail label="Name" value={selectedLead.fullName} />
+              <Detail label="Email" value={selectedLead.email} />
+              <Detail label="Phone" value={selectedLead.phoneNumber} />
+              <Detail label="Date" value={leadDisplayDate(selectedLead)} />
+              <Detail label="Slot" value={selectedLead.selectedSlot ?? "—"} />
+              <Detail label="Insurance" value={`${selectedLead.insuranceType ?? "—"} (${selectedLead.insuranceCompany ?? "—"})`} />
+              <Detail label="Address" value={leadAddress(selectedLead)} />
+              <Detail label="Status" value={selectedLead.status ?? "pending"} />
+            </Pressable>
+          </Pressable>
+        </Modal>
+      )}
     </ScrollView>
   );
 }
@@ -170,6 +235,15 @@ function StatusBadge({ status }: { status: "pending" | "completed" }) {
   return (
     <View style={[styles.badge, { backgroundColor: bg }]}>
       <Text style={styles.badgeText}>{text}</Text>
+    </View>
+  );
+}
+
+function Detail({ label, value }: { label: string; value?: string }) {
+  return (
+    <View style={{ flexDirection: "row", marginTop: 8 }}>
+      <Text style={{ width: 110, color: COLORS.dim, fontWeight: "700" }}>{label}:</Text>
+      <Text style={{ flex: 1, color: COLORS.text }}>{value ?? "—"}</Text>
     </View>
   );
 }
@@ -226,6 +300,8 @@ const styles = StyleSheet.create({
     elevation: 2,
     marginBottom: 16,
   },
+
+  // Shared row style (matches AppointmentList look)
   row: {
     flexDirection: "row",
     alignItems: "center",
@@ -238,7 +314,17 @@ const styles = StyleSheet.create({
   },
   rowTitle: { fontWeight: "700", color: COLORS.text },
   rowSub: { color: COLORS.dim, marginTop: 2 },
+  rowSubSmall: { color: COLORS.dim, marginTop: 2, fontSize: 12 },
   when: { color: COLORS.sage, fontWeight: "700" },
+  slot: { color: COLORS.dim },
+
+  // small colored service dot (for appointments)
+  dot: {
+    width: 14,
+    height: 14,
+    borderRadius: 7,
+    marginRight: 4,
+  },
 
   badge: {
     paddingHorizontal: 10,
@@ -256,4 +342,27 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
   },
   moreBtnText: { color: COLORS.accent, fontWeight: "700" },
+
+  // Modal
+  overlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,.25)",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 20,
+  },
+  modalCard: {
+    backgroundColor: "white",
+    borderRadius: 12,
+    padding: 18,
+    width: "100%",
+    maxWidth: 620,
+    shadowColor: "#000",
+    shadowOpacity: 0.14,
+    shadowRadius: 18,
+    shadowOffset: { width: 0, height: 10 },
+    elevation: 6,
+  },
+  modalHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 6 },
+  modalTitle: { fontSize: 18, fontWeight: "800", color: COLORS.text },
 });
