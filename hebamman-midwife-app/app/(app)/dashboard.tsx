@@ -60,7 +60,7 @@ const formatDate = (iso: string) =>
   });
 
 export default function Dashboard() {
-  const { user } = useAuth();
+ const { user, logout } = useAuth();
 
   // ---- Leads (for the logged-in midwife) ----
   const { upcoming, loading: leadsLoading } = useLeads(user?.id);
@@ -191,7 +191,12 @@ export default function Dashboard() {
             </View>
           </View>
         ))}
+        
       </View>
+
+      <TouchableOpacity onPress={logout} style={styles.logout}>
+  <Text style={styles.logoutText}>Logout</Text>
+</TouchableOpacity>
 
       {/* Lead details modal */}
       {selectedLead && (
@@ -365,4 +370,16 @@ const styles = StyleSheet.create({
   },
   modalHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 6 },
   modalTitle: { fontSize: 18, fontWeight: "800", color: COLORS.text },
+
+
+  logout: {
+   marginTop: 20,
+   backgroundColor: COLORS.accent,
+   paddingVertical: 14,
+   borderRadius: 14,
+   alignItems: "center",
+   marginBottom: 8, // a little breathing room at the very end
+ },
+  logoutText: { color: "white", fontWeight: "700" }
+
 });
