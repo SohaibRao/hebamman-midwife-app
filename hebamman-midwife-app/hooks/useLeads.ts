@@ -41,18 +41,13 @@ function parseDMY(d: string | undefined) {
 
 export function useLeads(midwifeId?: string) {
   const [leads, setLeads] = useState<Lead[]>([]);
-  const [loading, setLoading] = useState<boolean>(true);
+  const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
-  // const resolvedId = midwifeId || process.env.EXPO_PUBLIC_MIDWIFE_ID || "";
-  const resolvedId = '68b975d05e2ae9bd8be4f4e2';
+  const resolvedId = midwifeId?.trim() || "";
 
   const fetchLeads = useCallback(async () => {
-    if (!resolvedId) {
-      setError("Midwife ID is missing");
-      setLoading(false);
-      return;
-    }
+    if (!resolvedId) return; // wait until we actually have an id
     setLoading(true);
     setError(null);
     try {
@@ -71,15 +66,17 @@ export function useLeads(midwifeId?: string) {
   }, [resolvedId]);
 
   useEffect(() => {
-    fetchLeads();
-  }, [fetchLeads]);
+    if (resolvedId) {
+      fetchLeads();
+    }
+  }, [fetchLeads, resolvedId]);
 
   const today = startOfDay(new Date());
 
   const upcoming = useMemo(() => {
     const withDates = leads
       .map((l) => ({ l, d: parseDMY(l.date) }))
-      .filter((x) => x.d); // keep parsable
+      .filter((x) => x.d);
     return withDates
       .filter(({ d }) => d && (isAfter(d, today) || +d === +today))
       .sort((a, b) => compareAsc(a.d!, b.d!))
@@ -96,7 +93,9 @@ export function useLeads(midwifeId?: string) {
       .map((x) => x.l);
   }, [leads, today]);
 
-  const refresh = useCallback(() => fetchLeads(), [fetchLeads]);
+  const refresh = useCallback(() => {
+    if (resolvedId) return fetchLeads();
+  }, [fetchLeads, resolvedId]);
 
   return { leads, upcoming, past, loading, error, refresh };
 }
@@ -104,7 +103,12 @@ export function useLeads(midwifeId?: string) {
 export function leadDisplayDate(lead: Lead) {
   const d = parseDMY(lead.date);
   return d
-    ? d.toLocaleDateString(undefined, { weekday: "short", day: "2-digit", month: "short", year: "numeric" })
+    ? d.toLocaleDateString(undefined, {
+        weekday: "short",
+        day: "2-digit",
+        month: "short",
+        year: "numeric",
+      })
     : lead.date;
 }
 

@@ -13,6 +13,7 @@ import {
 
 // ---- Leads hook & helpers ----
 import { Lead, leadAddress, leadDisplayDate, useLeads } from "@/hooks/useLeads";
+import { useMidwifeProfile } from "@/hooks/useMidwifeProfile";
 
 // ---- Appointments helpers (reuse the list look & feel) ----
 import {
@@ -62,8 +63,14 @@ const formatDate = (iso: string) =>
 export default function Dashboard() {
  const { user, logout } = useAuth();
 
-  // ---- Leads (for the logged-in midwife) ----
-  const { upcoming, loading: leadsLoading } = useLeads(user?.id);
+ console.log("user data is: ", user)
+
+ // 1) Get profile by userId, then get midwifeId (_id)
+  const { data: profile, status: pStatus, error: pError } = useMidwifeProfile(user?.id);
+  const midwifeId = profile?._id;
+
+  // 2) Fetch leads by midwifeId
+  const { upcoming, loading: leadsLoading } = useLeads(midwifeId);
   const [selectedLead, setSelectedLead] = React.useState<Lead | null>(null);
   const upcomingLeads5 = React.useMemo(() => upcoming.slice(0, 5), [upcoming]);
 
@@ -197,6 +204,12 @@ export default function Dashboard() {
       <TouchableOpacity onPress={logout} style={styles.logout}>
   <Text style={styles.logoutText}>Logout</Text>
 </TouchableOpacity>
+
+<Link href={{ pathname: "/(app)/profile" } as any} asChild>
+  <TouchableOpacity style={styles.linkBtn}>
+    <Text style={styles.linkBtnText}>Open Profile</Text>
+  </TouchableOpacity>
+</Link>
 
       {/* Lead details modal */}
       {selectedLead && (

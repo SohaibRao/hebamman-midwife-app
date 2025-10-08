@@ -2,8 +2,9 @@
 import LeadList from "@/components/leads/LeadList";
 import { useAuth } from "@/context/AuthContext";
 import { Lead, leadAddress, leadDisplayDate, useLeads } from "@/hooks/useLeads";
+import { useMidwifeProfile } from "@/hooks/useMidwifeProfile";
 import React from "react";
-import { Modal, Pressable, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { Modal, Pressable, StyleSheet, Text, TouchableOpacity, View, ActivityIndicator } from "react-native";
 
 const COLORS = {
   bg: "#F6F8F7",
@@ -17,9 +18,22 @@ type Tab = "upcoming" | "past";
 
 export default function LeadsScreen() {
   const { user } = useAuth();
-  const { upcoming, past, loading, error, refresh } = useLeads(user?.id);
+
+  // 1) load profile by userId
+  const { data: profile, status: pStatus, error: pError, refresh: pRefresh } = useMidwifeProfile(user?.id);
+
+  // 2) extract the midwifeId from profile
+  const midwifeId = profile?._id;
+
+  // 3) fetch leads by midwifeId
+  const { upcoming, past, loading, error, refresh } = useLeads(midwifeId);
+
   const [tab, setTab] = React.useState<Tab>("upcoming");
   const [selected, setSelected] = React.useState<Lead | null>(null);
+
+  // combined states
+  const combinedLoading = pStatus === "loading" || loading;
+  const combinedError = pError || error;
 
   const data = tab === "upcoming" ? upcoming : past;
 
@@ -37,19 +51,30 @@ export default function LeadsScreen() {
         </View>
       </View>
 
-      {error && (
+      {combinedError && (
         <View style={{ paddingHorizontal: 16 }}>
-          <Text style={{ color: "crimson" }}>{error}</Text>
+          <Text style={{ color: "crimson" }}>{combinedError}</Text>
         </View>
       )}
 
-      <LeadList
-        data={data}
-        loading={loading}
-        onPressMore={(lead) => setSelected(lead)}
-        onRefresh={refresh}
-        emptyText={tab === "upcoming" ? "No upcoming leads." : "No past leads."}
-      />
+      {/* If profile not ready yet, show a centered spinner */}
+      {!midwifeId && pStatus === "loading" ? (
+        <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
+          <ActivityIndicator />
+        </View>
+      ) : (
+        <LeadList
+          data={data}
+          loading={combinedLoading}
+          onPressMore={(lead) => setSelected(lead)}
+          onRefresh={() => {
+            // refresh both if needed
+            if (!midwifeId) pRefresh();
+            else refresh?.();
+          }}
+          emptyText={tab === "upcoming" ? "No upcoming leads." : "No past leads."}
+        />
+      )}
 
       {/* Details modal */}
       {selected && (
@@ -58,7 +83,9 @@ export default function LeadsScreen() {
             <Pressable style={styles.modalCard}>
               <View style={styles.modalHeader}>
                 <Text style={styles.modalTitle}>Lead Details</Text>
-                <TouchableOpacity onPress={() => setSelected(null)}><Text style={{ fontWeight: "700", color: COLORS.dim }}>✕</Text></TouchableOpacity>
+                <TouchableOpacity onPress={() => setSelected(null)}>
+                  <Text style={{ fontWeight: "700", color: COLORS.dim }}>✕</Text>
+                </TouchableOpacity>
               </View>
               <Row label="Name" value={selected.fullName} />
               <Row label="Email" value={selected.email} />
@@ -91,7 +118,7 @@ const styles = StyleSheet.create({
   tabs: { backgroundColor: "#E7ECEA", borderRadius: 12, flexDirection: "row", padding: 4, gap: 6, alignSelf: "flex-start" },
   tabBtn: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 8 },
   tabActive: { backgroundColor: COLORS.card },
-  tabText: { color: COLORS.dim, fontWeight: "700" },
+  tabText: { color: "#5C6B63", fontWeight: "700" },
   tabTextActive: { color: COLORS.text },
 
   overlay: { flex: 1, backgroundColor: "rgba(0,0,0,.25)", alignItems: "center", justifyContent: "center", padding: 20 },
