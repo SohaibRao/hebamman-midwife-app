@@ -211,6 +211,12 @@ export default function Dashboard() {
   </TouchableOpacity>
 </Link>
 
+<Link href={{ pathname: "/(app)/patients" } as any} asChild>
+  <TouchableOpacity style={styles.linkBtn}>
+    <Text style={styles.linkBtnText}>Open patients</Text>
+  </TouchableOpacity>
+</Link>
+
       {/* Lead details modal */}
       {selectedLead && (
         <Modal visible transparent animationType="fade" onRequestClose={() => setSelectedLead(null)}>
