@@ -1397,37 +1397,43 @@ function MonthCard({
       </View>
 
       {/* Appointments for selected day */}
-      <View style={{ marginTop: 12 }}>
-        <Text style={styles.sectionTitle}>{selected ? `Appointments on ${fmtDateShort(selected)}` : "Select a day"}</Text>
-        {list.length === 0 ? (
-          <Text style={{ color: COLORS.dim, marginTop: 6 }}>No appointments.</Text>
-        ) : (
-          list.map((item) => (
-            <View key={`${item.serviceCode}-${item.appointmentId}`} style={[styles.cardRow, { marginTop: 8 }]}>
-              <View style={[styles.dot, { backgroundColor: codeColor(item.serviceCode) }]} />
-              <View style={{ flex: 1 }}>
-                <Text style={styles.rowTitle}>
-                  {item.serviceCode} • {getPatientName(item.clientId)}
-                </Text>
-                <Text style={styles.rowSub}>
-                  {item.startTime}–{item.endTime} • {item.duration}m
-                </Text>
-                <Text style={styles.statusText}>
-                  Status: <Text style={{ fontWeight: "800" }}>{item.status ?? "—"}</Text>
-                </Text>
-              </View>
-              <View style={{ gap: 8 }}>
-                <TouchableOpacity onPress={() => onPressAppt(item)} style={styles.ghostBtn}>
-                  <Text style={styles.ghostText}>Details</Text>
-                </TouchableOpacity>
-                <TouchableOpacity onPress={() => onPressEdit(item)} style={styles.editBtn}>
-                  <Text style={styles.editText}>Edit</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          ))
-        )}
-      </View>
+     <View style={{ marginTop: 12, maxHeight: 300 }}>
+  <Text style={styles.sectionTitle}>{selected ? `Appointments on ${fmtDateShort(selected)}` : "Select a day"}</Text>
+  {list.length === 0 ? (
+    <Text style={{ color: COLORS.dim, marginTop: 6 }}>No appointments.</Text>
+  ) : (
+    <ScrollView 
+      style={{ maxHeight: 250 }} 
+      showsVerticalScrollIndicator={true}
+      nestedScrollEnabled={true}
+    >
+      {list.map((item) => (
+        <View key={`${item.serviceCode}-${item.appointmentId}`} style={[styles.cardRow, { marginTop: 8 }]}>
+          <View style={[styles.dot, { backgroundColor: codeColor(item.serviceCode) }]} />
+          <View style={{ flex: 1 }}>
+            <Text style={styles.rowTitle}>
+              {item.serviceCode} • {getPatientName(item.clientId)}
+            </Text>
+            <Text style={styles.rowSub}>
+              {item.startTime}–{item.endTime} • {item.duration}m
+            </Text>
+            <Text style={styles.statusText}>
+              Status: <Text style={{ fontWeight: "800" }}>{item.status ?? "—"}</Text>
+            </Text>
+          </View>
+          <View style={{ gap: 8 }}>
+            <TouchableOpacity onPress={() => onPressAppt(item)} style={styles.ghostBtn}>
+              <Text style={styles.ghostText}>Details</Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => onPressEdit(item)} style={styles.editBtn}>
+              <Text style={styles.editText}>Edit</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      ))}
+    </ScrollView>
+  )}
+</View>
     </View>
   );
 }
