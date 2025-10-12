@@ -454,16 +454,7 @@ export default function Dashboard() {
           ))}
       </View>
 
-      {/* Action Buttons */}
-      <TouchableOpacity onPress={logout} style={styles.logout}>
-        <Text style={styles.logoutText}>Logout</Text>
-      </TouchableOpacity>
-
-      <Link href={{ pathname: "/(app)/profile" } as any} asChild>
-        <TouchableOpacity style={styles.linkBtnSecondary}>
-          <Text style={styles.linkBtnSecondaryText}>Open Profile</Text>
-        </TouchableOpacity>
-      </Link>
+  
 
       {/* Lead details modal */}
       {selectedLead && (
