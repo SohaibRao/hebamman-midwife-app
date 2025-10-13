@@ -697,6 +697,40 @@ export default function AppointmentsScreen() {
     return freeRanges.length > 0 ? freeRanges : ["No free time available"];
   }, [timetable, apptsByDay]);
 
+
+  const filterTimeOptionsByAvailableRanges = useCallback((ranges: string[]): string[] => {
+  if (ranges[0] === "No free time available") return [];
+  
+  const allTimes = generateTimeOptions();
+  const availableTimes: string[] = [];
+  
+  ranges.forEach(range => {
+    const match = range.match(/(\d{2}):(\d{2}) - (\d{2}):(\d{2})/);
+    if (match) {
+      const rangeStart = `${match[1]}:${match[2]}`;
+      const rangeEnd = `${match[3]}:${match[4]}`;
+      
+      const startMinutes = parseTime(rangeStart);
+      const endMinutes = parseTime(rangeEnd);
+      
+      allTimes.forEach(time => {
+        const timeMinutes = parseTime(time);
+        // Include times that fall within the range and leave room for the appointment duration
+        if (selectedEdit) {
+          const duration = getServiceDuration(selectedEdit.serviceCode);
+          const endTimeMinutes = timeMinutes + duration;
+          
+          if (timeMinutes >= startMinutes && endTimeMinutes <= endMinutes) {
+            availableTimes.push(time);
+          }
+        }
+      });
+    }
+  });
+  
+  return availableTimes;
+}, [selectedEdit]);
+
   const isCustomTimeValid = (startTime: string, endTime: string, date: Date): boolean => {
     const startMinutes = parseTime(startTime);
     const endMinutes = parseTime(endTime);
@@ -1078,64 +1112,72 @@ export default function AppointmentsScreen() {
                       </TouchableOpacity>
 
                       {showCustomTimeOption && (
-                        <View style={styles.customTimeContainer}>
-                          <Text style={styles.customTimeTitle}>Custom Time Slot</Text>
+  <View style={styles.customTimeContainer}>
+    <Text style={styles.customTimeTitle}>Custom Time Slot</Text>
 
-                          <View style={styles.availableTimeContainer}>
-                            <Text style={styles.availableTimeLabel}>Available Time Today:</Text>
-                            {availableTimeRanges.map((range, idx) => (
-                              <Text key={idx} style={styles.availableTimeText}>{range}</Text>
-                            ))}
-                          </View>
+    <View style={styles.availableTimeContainer}>
+      <Text style={styles.availableTimeLabel}>Available Time Today:</Text>
+      {availableTimeRanges.map((range, idx) => (
+        <Text key={idx} style={styles.availableTimeText}>{range}</Text>
+      ))}
+    </View>
 
-                          <View style={{ marginBottom: 12 }}>
-                            <Text style={styles.inputLabel}>Start Time</Text>
-                            <View style={styles.pickerContainer}>
-                              <ScrollView style={styles.timePicker} nestedScrollEnabled>
-                                {generateTimeOptions().map(time => (
-                                  <TouchableOpacity
-                                    key={time}
-                                    onPress={() => {
-                                      setCustomStartTime(time);
-                                      if (selectedEdit) {
-                                        const duration = getServiceDuration(selectedEdit.serviceCode);
-                                        const end = calculateEndTime(time, duration);
-                                        setCustomEndTime(end);
-                                      }
-                                    }}
-                                    style={[
-                                      styles.timeOption,
-                                      customStartTime === time && styles.timeOptionSelected
-                                    ]}
-                                  >
-                                    <Text style={[
-                                      styles.timeOptionText,
-                                      customStartTime === time && styles.timeOptionTextSelected
-                                    ]}>
-                                      {time}
-                                    </Text>
-                                  </TouchableOpacity>
-                                ))}
-                              </ScrollView>
-                            </View>
-                          </View>
+    <View style={{ marginBottom: 12 }}>
+      <Text style={styles.inputLabel}>Start Time</Text>
+      <View style={styles.pickerContainer}>
+        <ScrollView style={styles.timePicker} nestedScrollEnabled>
+          {filterTimeOptionsByAvailableRanges(availableTimeRanges).length === 0 ? (
+            <View style={{ padding: 12 }}>
+              <Text style={{ color: COLORS.dim, textAlign: "center" }}>
+                No available time slots
+              </Text>
+            </View>
+          ) : (
+            filterTimeOptionsByAvailableRanges(availableTimeRanges).map(time => (
+              <TouchableOpacity
+                key={time}
+                onPress={() => {
+                  setCustomStartTime(time);
+                  if (selectedEdit) {
+                    const duration = getServiceDuration(selectedEdit.serviceCode);
+                    const end = calculateEndTime(time, duration);
+                    setCustomEndTime(end);
+                  }
+                }}
+                style={[
+                  styles.timeOption,
+                  customStartTime === time && styles.timeOptionSelected
+                ]}
+              >
+                <Text style={[
+                  styles.timeOptionText,
+                  customStartTime === time && styles.timeOptionTextSelected
+                ]}>
+                  {time}
+                </Text>
+              </TouchableOpacity>
+            ))
+          )}
+        </ScrollView>
+      </View>
+    </View>
 
-                          <View style={{ marginBottom: 12 }}>
-                            <Text style={styles.inputLabel}>End Time (Auto-calculated)</Text>
-                            <View style={styles.disabledInput}>
-                              <Text style={{ color: COLORS.dim }}>
-                                {customEndTime || "Will be calculated automatically"}
-                              </Text>
-                            </View>
-                          </View>
+    <View style={{ marginBottom: 12 }}>
+      <Text style={styles.inputLabel}>End Time (Auto-calculated)</Text>
+      <View style={styles.disabledInput}>
+        <Text style={{ color: COLORS.dim }}>
+          {customEndTime || "Will be calculated automatically"}
+        </Text>
+      </View>
+    </View>
 
-                          {customStartTime && customEndTime && selectedEdit && (
-                            <Text style={{ fontSize: 12, color: COLORS.dim, marginTop: 8 }}>
-                              Duration: {getServiceDuration(selectedEdit.serviceCode)} minutes
-                            </Text>
-                          )}
-                        </View>
-                      )}
+    {customStartTime && customEndTime && selectedEdit && (
+      <Text style={{ fontSize: 12, color: COLORS.dim, marginTop: 8 }}>
+        Duration: {getServiceDuration(selectedEdit.serviceCode)} minutes
+      </Text>
+    )}
+  </View>
+)}
                     </View>
                   )}
                 </View>
