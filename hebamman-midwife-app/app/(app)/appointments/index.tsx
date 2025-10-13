@@ -4,6 +4,7 @@ import {
   FlatList,
   Modal,
   ScrollView,
+  Dimensions,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -25,6 +26,9 @@ const COLORS = {
   green: "#22C55E",
   line: "#E5E7EB",
 };
+
+const SCREEN_WIDTH = Dimensions.get('window').width;
+
 
 // -------------------- Types --------------------
 type MonthKey = string; // "M/YYYY"
@@ -1258,13 +1262,26 @@ function CalendarAllMonths({
   onPressEdit: (a: UiApt) => void;
   getPatientName: (clientId?: string) => string;
 }) {
-  const scrollRef = useRef<ScrollView>(null);
+  const flatListRef = useRef<FlatList>(null);
   const [index, setIndex] = useState(0);
+
+  const viewConfigRef = useRef({ viewAreaCoveragePercentThreshold: 50 });
+
+  const onViewRef = useRef((viewableItems: any) => {
+    if (viewableItems.viewableItems.length > 0) {
+      const newIndex = viewableItems.viewableItems[0].index;
+      if (newIndex !== index && newIndex !== null) {
+        setIndex(newIndex);
+      }
+    }
+  });
 
   const go = (dir: -1 | 1) => {
     const next = Math.max(0, Math.min(months.length - 1, index + dir));
-    setIndex(next);
-    scrollRef.current?.scrollTo({ x: next * (360 + 32), animated: true });
+    if (next !== index) {
+      setIndex(next);
+      flatListRef.current?.scrollToIndex({ index: next, animated: true });
+    }
   };
 
   if (months.length === 0) {
@@ -1276,6 +1293,8 @@ function CalendarAllMonths({
       </View>
     );
   }
+
+  const currentMonth = months[index] || months[0];
 
   return (
     <View style={{ flex: 1 }}>
@@ -1291,7 +1310,7 @@ function CalendarAllMonths({
         <TouchableOpacity onPress={() => go(-1)} disabled={index === 0} style={[styles.navBtn, index === 0 && { opacity: 0.4 }]}>
           <Text style={styles.navBtnText}>◀</Text>
         </TouchableOpacity>
-        <Text style={[styles.sectionTitle, { textAlign: "center" }]}>{months[index].title}</Text>
+        <Text style={[styles.sectionTitle, { textAlign: "center" }]}>{currentMonth?.title || "—"}</Text>
         <TouchableOpacity
           onPress={() => go(1)}
           disabled={index === months.length - 1}
@@ -1301,34 +1320,36 @@ function CalendarAllMonths({
         </TouchableOpacity>
       </View>
 
-      <ScrollView
+      <FlatList
+        ref={flatListRef}
+        data={months}
         horizontal
         pagingEnabled
-        ref={scrollRef}
-        onMomentumScrollEnd={(e) => {
-          const w = e.nativeEvent.layoutMeasurement.width;
-          const i = Math.round(e.nativeEvent.contentOffset.x / w);
-          if (i !== index) setIndex(i);
-        }}
         showsHorizontalScrollIndicator={false}
-        contentContainerStyle={{ paddingHorizontal: 16, gap: 16 }}
-      >
-        {months.map(({ y, m, key }) => (
-          <MonthCard
-            key={key}
-            year={y}
-            monthIndex={m}
-            apptsByDay={apptsByDay}
-            onPressAppt={onPressAppt}
-            onPressEdit={onPressEdit}
-            getPatientName={getPatientName}
-          />
-        ))}
-      </ScrollView>
+        onViewableItemsChanged={onViewRef.current}
+        viewabilityConfig={viewConfigRef.current}
+        keyExtractor={(item) => item.key}
+        renderItem={({ item }) => (
+          <View style={{ width: SCREEN_WIDTH, alignItems: "center" }}>
+            <MonthCard
+              year={item.y}
+              monthIndex={item.m}
+              apptsByDay={apptsByDay}
+              onPressAppt={onPressAppt}
+              onPressEdit={onPressEdit}
+              getPatientName={getPatientName}
+            />
+          </View>
+        )}
+        getItemLayout={(data, index) => ({
+          length: SCREEN_WIDTH,
+          offset: SCREEN_WIDTH * index,
+          index,
+        })}
+      />
     </View>
   );
 }
-
 function MonthCard({
   year,
   monthIndex,
@@ -1349,92 +1370,160 @@ function MonthCard({
   const daysInMonth = new Date(year, monthIndex + 1, 0).getDate();
 
   const [selected, setSelected] = useState<Date | null>(null);
+  const [showApptModal, setShowApptModal] = useState(false);
   const selectedKey = selected ? toDMY(selected) : null;
   const list = selectedKey ? apptsByDay[selectedKey] ?? [] : [];
 
+  const handleDatePress = (date: Date) => {
+    const key = toDMY(date);
+    const dayApts = apptsByDay[key] ?? [];
+    
+    if (dayApts.length > 0) {
+      setSelected(date);
+      setShowApptModal(true);
+    }
+  };
+
   return (
-    <View style={[styles.card, { width: 360 }]}>
-      {/* Week header */}
-      <View style={styles.weekHeader}>
-        {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((d) => (
-          <Text key={d} style={styles.weekHdrText}>
-            {d}
+    <>
+      <View style={[styles.card, { width: 360, height: 380 }]}>
+        {/* Week header */}
+        <View style={styles.weekHeader}>
+          {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((d) => (
+            <Text key={d} style={styles.weekHdrText}>
+              {d}
+            </Text>
+          ))}
+        </View>
+
+        {/* Grid */}
+        <View style={styles.grid}>
+          {Array.from({ length: startWeekday }).map((_, i) => (
+            <View key={`lead-${i}`} style={styles.gridCell} />
+          ))}
+          {Array.from({ length: daysInMonth }).map((_, idx) => {
+            const d = new Date(year, monthIndex, idx + 1);
+            const key = toDMY(d);
+            const dayApts = apptsByDay[key] ?? [];
+            
+            return (
+              <TouchableOpacity
+                key={key}
+                style={[
+                  styles.gridCell,
+                  dayApts.length > 0 && { backgroundColor: "#EAF1EE" }
+                ]}
+                onPress={() => handleDatePress(d)}
+                disabled={dayApts.length === 0}
+              >
+                <Text style={[
+                  styles.gridDay,
+                  dayApts.length > 0 && { fontWeight: "800", color: COLORS.accent }
+                ]}>{idx + 1}</Text>
+                {dayApts.length > 0 && (
+                  <View style={styles.dayApptDotRow}>
+                    {dayApts.slice(0, 3).map((apt, i) => (
+                      <View
+                        key={i}
+                        style={[styles.dayApptDot, { backgroundColor: codeColor(apt.serviceCode) }]}
+                      />
+                    ))}
+                  </View>
+                )}
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+
+        {/* Helper text */}
+        <View style={{ marginTop: 16, paddingHorizontal: 8 }}>
+          <Text style={{ color: COLORS.dim, fontSize: 13, textAlign: "center" }}>
+            Tap on a highlighted date to view appointments
           </Text>
-        ))}
+        </View>
       </View>
 
-      {/* Grid */}
-      <View style={styles.grid}>
-        {Array.from({ length: startWeekday }).map((_, i) => (
-          <View key={`lead-${i}`} style={styles.gridCell} />
-        ))}
-        {Array.from({ length: daysInMonth }).map((_, idx) => {
-          const d = new Date(year, monthIndex, idx + 1);
-          const key = toDMY(d);
-          const dayApts = apptsByDay[key] ?? [];
-          const isSelected = selected && sameDay(d, selected);
-          
-          return (
-            <TouchableOpacity
-              key={key}
-              style={[styles.gridCell, isSelected && { backgroundColor: "#E7ECEA", borderRadius: 8 }]}
-              onPress={() => setSelected(d)}
+      {/* Appointments Modal */}
+      <Modal
+        visible={showApptModal}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowApptModal(false)}
+      >
+        <View style={styles.overlay}>
+          <View style={[styles.modalCard, { maxWidth: 400, maxHeight: "80%" }]}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>
+                {selected ? fmtDateShort(selected) : "Appointments"}
+              </Text>
+              <TouchableOpacity onPress={() => setShowApptModal(false)}>
+                <Text style={{ fontWeight: "800", color: COLORS.dim, fontSize: 20 }}>✕</Text>
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView 
+              style={{ marginTop: 12 }}
+              showsVerticalScrollIndicator={true}
             >
-              <Text style={styles.gridDay}>{idx + 1}</Text>
-              {dayApts.length > 0 && (
-                <View style={styles.dayApptDotRow}>
-                  {dayApts.slice(0, 3).map((apt, i) => (
-                    <View
-                      key={i}
-                      style={[styles.dayApptDot, { backgroundColor: codeColor(apt.serviceCode) }]}
-                    />
-                  ))}
-                </View>
+              {list.length === 0 ? (
+                <Text style={{ color: COLORS.dim, textAlign: "center", padding: 20 }}>
+                  No appointments on this day.
+                </Text>
+              ) : (
+                list.map((item) => (
+                  <View 
+                    key={`${item.serviceCode}-${item.appointmentId}`} 
+                    style={[styles.cardRow, { marginTop: 8, paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: COLORS.line }]}
+                  >
+                    <View style={[styles.dot, { backgroundColor: codeColor(item.serviceCode) }]} />
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.rowTitle}>
+                        {item.serviceCode} • {getPatientName(item.clientId)}
+                      </Text>
+                      <Text style={styles.rowSub}>
+                        {item.startTime}–{item.endTime} • {item.duration}m
+                      </Text>
+                      <Text style={styles.statusText}>
+                        Status: <Text style={{ fontWeight: "800" }}>{item.status ?? "—"}</Text>
+                      </Text>
+                    </View>
+                    <View style={{ gap: 8 }}>
+                      <TouchableOpacity 
+                        onPress={() => {
+                          setShowApptModal(false);
+                          onPressAppt(item);
+                        }} 
+                        style={styles.ghostBtn}
+                      >
+                        <Text style={styles.ghostText}>Details</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity 
+                        onPress={() => {
+                          setShowApptModal(false);
+                          onPressEdit(item);
+                        }} 
+                        style={styles.editBtn}
+                      >
+                        <Text style={styles.editText}>Edit</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                ))
               )}
-            </TouchableOpacity>
-          );
-        })}
-      </View>
+            </ScrollView>
 
-      {/* Appointments for selected day */}
-     <View style={{ marginTop: 12, maxHeight: 300 }}>
-  <Text style={styles.sectionTitle}>{selected ? `Appointments on ${fmtDateShort(selected)}` : "Select a day"}</Text>
-  {list.length === 0 ? (
-    <Text style={{ color: COLORS.dim, marginTop: 6 }}>No appointments.</Text>
-  ) : (
-    <ScrollView 
-      style={{ maxHeight: 250 }} 
-      showsVerticalScrollIndicator={true}
-      nestedScrollEnabled={true}
-    >
-      {list.map((item) => (
-        <View key={`${item.serviceCode}-${item.appointmentId}`} style={[styles.cardRow, { marginTop: 8 }]}>
-          <View style={[styles.dot, { backgroundColor: codeColor(item.serviceCode) }]} />
-          <View style={{ flex: 1 }}>
-            <Text style={styles.rowTitle}>
-              {item.serviceCode} • {getPatientName(item.clientId)}
-            </Text>
-            <Text style={styles.rowSub}>
-              {item.startTime}–{item.endTime} • {item.duration}m
-            </Text>
-            <Text style={styles.statusText}>
-              Status: <Text style={{ fontWeight: "800" }}>{item.status ?? "—"}</Text>
-            </Text>
-          </View>
-          <View style={{ gap: 8 }}>
-            <TouchableOpacity onPress={() => onPressAppt(item)} style={styles.ghostBtn}>
-              <Text style={styles.ghostText}>Details</Text>
-            </TouchableOpacity>
-            <TouchableOpacity onPress={() => onPressEdit(item)} style={styles.editBtn}>
-              <Text style={styles.editText}>Edit</Text>
-            </TouchableOpacity>
+            <View style={{ marginTop: 16 }}>
+              <TouchableOpacity
+                onPress={() => setShowApptModal(false)}
+                style={styles.cta}
+              >
+                <Text style={styles.ctaText}>Close</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
-      ))}
-    </ScrollView>
-  )}
-</View>
-    </View>
+      </Modal>
+    </>
   );
 }
 
@@ -1580,37 +1669,36 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     marginBottom: 8,
   },
-  weekHeader: { 
-    flexDirection: "row", 
-    paddingHorizontal: 10, 
-    paddingBottom: 6,
-    gap: 6
-  },
+ weekHeader: { 
+  flexDirection: "row", 
+  paddingHorizontal: 10, 
+  paddingBottom: 6,
+},
   weekHeaderRow: { flexDirection: "row", gap: 6 },
-  weekHdrText: { 
-    color: COLORS.dim, 
-    fontWeight: "700", 
-    textAlign: "center", 
-    flex: 1,
-    fontSize: 12
-  },
-  grid: { 
-    paddingHorizontal: 10, 
-    paddingBottom: 10, 
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 6
-  },
+weekHdrText: { 
+  color: COLORS.dim, 
+  fontWeight: "700", 
+  textAlign: "center", 
+  width: "14.28%",  // Changed from flex: 1
+  fontSize: 12
+},
+grid: { 
+  paddingHorizontal: 10, 
+  paddingBottom: 10, 
+  flexDirection: "row",
+  flexWrap: "wrap",
+},
   weekRow: { flexDirection: "row", gap: 6 },
-  gridCell: {
-    width: "13%",
-    aspectRatio: 1,
-    borderRadius: 10,
-    backgroundColor: "#F4F6F5",
-    padding: 6,
-    justifyContent: "space-between",
-    alignItems: "center",
-  },
+gridCell: {
+  width: "14.28%",  // Changed from "13%"
+  aspectRatio: 1,
+  borderRadius: 8,  // Changed from 10
+  backgroundColor: "#F4F6F5",
+  padding: 4,  // Changed from 6
+  justifyContent: "space-between",
+  alignItems: "center",
+  marginBottom: 2,  // Added this
+},
   dayCell: {
     flex: 1,
     aspectRatio: 0.9,
