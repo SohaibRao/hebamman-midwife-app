@@ -121,6 +121,8 @@ async function readJsonSafe<T = any>(res: Response): Promise<T> {
   }
 }
 
+
+
 // -------------------- Main Component --------------------
 export default function PatientAppointmentsScreen() {
   const router = useRouter();
@@ -355,78 +357,81 @@ export default function PatientAppointmentsScreen() {
   }, [timetable, apptsByDay]);
 
   // Find available time ranges
-  const findAvailableTimeRanges = useCallback((date: Date): string[] => {
-    if (!timetable) return ["00:00 - 23:59 available"];
+const findAvailableTimeRanges = useCallback((date: Date): string[] => {
+  if (!timetable) return ["00:00 - 23:59 available"];
 
-    const dayName = weekdayName(date);
-    const daySlots = timetable[dayName];
-    if (!daySlots?.slots) return ["00:00 - 23:59 available"];
+  const dayName = weekdayName(date);
+  const daySlots = timetable[dayName];
+  if (!daySlots?.slots) return ["00:00 - 23:59 available"];
 
-    const busySlots: { start: number; end: number }[] = [];
+  const busySlots: { start: number; end: number }[] = [];
 
-    Object.values(daySlots.slots).forEach((serviceSlots: any) => {
-      if (Array.isArray(serviceSlots)) {
-        serviceSlots.forEach((slot: TimeSlot) => {
-          busySlots.push({
-            start: parseTime(slot.startTime),
-            end: parseTime(slot.endTime)
-          });
+  // Add all timetable slots as busy
+  Object.values(daySlots.slots).forEach((serviceSlots: any) => {
+    if (Array.isArray(serviceSlots)) {
+      serviceSlots.forEach((slot: TimeSlot) => {
+        busySlots.push({
+          start: parseTime(slot.startTime),
+          end: parseTime(slot.endTime)
         });
-      }
-    });
-
-    const dateKey = toDMY(date);
-    const dayApts = apptsByDay[dateKey] ?? [];
-    dayApts.forEach(apt => {
-      busySlots.push({
-        start: parseTime(apt.startTime),
-        end: parseTime(apt.endTime)
       });
+    }
+  });
+
+  // Add all booked appointments as busy
+  const dateKey = toDMY(date);
+  const dayApts = apptsByDay[dateKey] ?? [];
+  dayApts.forEach(apt => {
+    busySlots.push({
+      start: parseTime(apt.startTime),
+      end: parseTime(apt.endTime)
     });
+  });
 
-    busySlots.sort((a, b) => a.start - b.start);
-    const mergedBusy: { start: number; end: number }[] = [];
+  // Sort and merge overlapping slots
+  busySlots.sort((a, b) => a.start - b.start);
+  const mergedBusy: { start: number; end: number }[] = [];
 
-    busySlots.forEach(slot => {
-      if (mergedBusy.length === 0) {
-        mergedBusy.push(slot);
+  busySlots.forEach(slot => {
+    if (mergedBusy.length === 0) {
+      mergedBusy.push(slot);
+    } else {
+      const last = mergedBusy[mergedBusy.length - 1];
+      if (slot.start <= last.end) {
+        last.end = Math.max(last.end, slot.end);
       } else {
-        const last = mergedBusy[mergedBusy.length - 1];
-        if (slot.start <= last.end) {
-          last.end = Math.max(last.end, slot.end);
-        } else {
-          mergedBusy.push(slot);
-        }
+        mergedBusy.push(slot);
       }
-    });
+    }
+  });
 
-    const freeRanges: string[] = [];
-    let currentTime = 0;
+  // Find free ranges
+  const freeRanges: string[] = [];
+  let currentTime = 0;
 
-    mergedBusy.forEach(busy => {
-      if (currentTime < busy.start) {
-        const startHour = Math.floor(currentTime / 60);
-        const startMin = currentTime % 60;
-        const endHour = Math.floor(busy.start / 60);
-        const endMin = busy.start % 60;
-        freeRanges.push(
-          `${String(startHour).padStart(2, '0')}:${String(startMin).padStart(2, '0')} - ${String(endHour).padStart(2, '0')}:${String(endMin).padStart(2, '0')} available`
-        );
-      }
-      currentTime = busy.end;
-    });
-
-    if (currentTime < 24 * 60) {
+  mergedBusy.forEach(busy => {
+    if (currentTime < busy.start) {
       const startHour = Math.floor(currentTime / 60);
       const startMin = currentTime % 60;
+      const endHour = Math.floor(busy.start / 60);
+      const endMin = busy.start % 60;
       freeRanges.push(
-        `${String(startHour).padStart(2, '0')}:${String(startMin).padStart(2, '0')} - 23:59 available`
+        `${String(startHour).padStart(2, '0')}:${String(startMin).padStart(2, '0')} - ${String(endHour).padStart(2, '0')}:${String(endMin).padStart(2, '0')} available`
       );
     }
+    currentTime = busy.end;
+  });
 
-    return freeRanges.length > 0 ? freeRanges : ["No free time available"];
-  }, [timetable, apptsByDay]);
+  if (currentTime < 24 * 60) {
+    const startHour = Math.floor(currentTime / 60);
+    const startMin = currentTime % 60;
+    freeRanges.push(
+      `${String(startHour).padStart(2, '0')}:${String(startMin).padStart(2, '0')} - 23:59 available`
+    );
+  }
 
+  return freeRanges.length > 0 ? freeRanges : ["No free time available"];
+}, [timetable, apptsByDay]);
   // Validate custom time
   const isCustomTimeValid = (startTime: string, endTime: string, date: Date): boolean => {
     const startMinutes = parseTime(startTime);
@@ -457,6 +462,37 @@ export default function PatientAppointmentsScreen() {
     alert("Selected time is not within available time ranges");
     return false;
   };
+
+  
+const filterTimeOptionsByAvailableRanges = useCallback((ranges: string[], serviceCode: string): string[] => {
+  if (ranges[0] === "No free time available") return [];
+  
+  const allTimes = generateTimeOptions();
+  const availableTimes: string[] = [];
+  
+  ranges.forEach(range => {
+    const match = range.match(/(\d{2}):(\d{2}) - (\d{2}):(\d{2})/);
+    if (match) {
+      const rangeStart = `${match[1]}:${match[2]}`;
+      const rangeEnd = `${match[3]}:${match[4]}`;
+      
+      const startMinutes = parseTime(rangeStart);
+      const endMinutes = parseTime(rangeEnd);
+      
+      allTimes.forEach(time => {
+        const timeMinutes = parseTime(time);
+        const duration = getServiceDuration(serviceCode);
+        const endTimeMinutes = timeMinutes + duration;
+        
+        if (timeMinutes >= startMinutes && endTimeMinutes <= endMinutes) {
+          availableTimes.push(time);
+        }
+      });
+    }
+  });
+  
+  return availableTimes;
+}, []);
 
   // Generate calendar days for modals
   const getCalendarDays = (month: Date) => {
@@ -982,47 +1018,77 @@ export default function PatientAppointmentsScreen() {
                   </Text>
                 </TouchableOpacity>
 
-                {showEditCustomTime && (
-                  <>
-                    <Text style={{ color: COLORS.dim, fontSize: 12, marginTop: 8 }}>
-                      Available ranges: {findAvailableTimeRanges(editDate).join(", ")}
-                    </Text>
-                    
-                    <View style={{ marginTop: 12 }}>
-                      <Text style={styles.inputLabel}>Start Time</Text>
-                      <ScrollView style={styles.timeScroll} nestedScrollEnabled>
-                        {generateTimeOptions().map(t => (
-                          <TouchableOpacity
-                            key={t}
-                            onPress={() => setEditCustomStart(t)}
-                            style={[styles.timeOption, editCustomStart === t && styles.timeOptionActive]}
-                          >
-                            <Text style={[styles.timeOptionText, editCustomStart === t && styles.timeOptionTextActive]}>
-                              {t}
-                            </Text>
-                          </TouchableOpacity>
-                        ))}
-                      </ScrollView>
-                    </View>
+               {showEditCustomTime && (
+  <View style={styles.customTimeContainer}>
+    <Text style={styles.customTimeTitle}>Custom Time Slot</Text>
 
-                    <View style={{ marginTop: 12 }}>
-                      <Text style={styles.inputLabel}>End Time</Text>
-                      <ScrollView style={styles.timeScroll} nestedScrollEnabled>
-                        {generateTimeOptions().map(t => (
-                          <TouchableOpacity
-                            key={t}
-                            onPress={() => setEditCustomEnd(t)}
-                            style={[styles.timeOption, editCustomEnd === t && styles.timeOptionActive]}
-                          >
-                            <Text style={[styles.timeOptionText, editCustomEnd === t && styles.timeOptionTextActive]}>
-                              {t}
-                            </Text>
-                          </TouchableOpacity>
-                        ))}
-                      </ScrollView>
-                    </View>
-                  </>
-                )}
+    <View style={styles.availableTimeContainer}>
+      <Text style={styles.availableTimeLabel}>Available Time Today:</Text>
+      {findAvailableTimeRanges(editDate).map((range, idx) => (
+        <Text key={idx} style={styles.availableTimeText}>{range}</Text>
+      ))}
+    </View>
+
+    <View style={{ marginBottom: 12 }}>
+      <Text style={styles.inputLabel}>Start Time</Text>
+      <View style={styles.pickerContainer}>
+        <ScrollView style={styles.timePicker} nestedScrollEnabled>
+          {filterTimeOptionsByAvailableRanges(
+            findAvailableTimeRanges(editDate),
+            selectedEdit.serviceCode
+          ).length === 0 ? (
+            <View style={{ padding: 12 }}>
+              <Text style={{ color: COLORS.dim, textAlign: "center" }}>
+                No available time slots
+              </Text>
+            </View>
+          ) : (
+            filterTimeOptionsByAvailableRanges(
+              findAvailableTimeRanges(editDate),
+              selectedEdit.serviceCode
+            ).map(time => (
+              <TouchableOpacity
+                key={time}
+                onPress={() => {
+                  setEditCustomStart(time);
+                  const duration = getServiceDuration(selectedEdit.serviceCode);
+                  const end = calculateEndTime(time, duration);
+                  setEditCustomEnd(end);
+                }}
+                style={[
+                  styles.timeOption,
+                  editCustomStart === time && styles.timeOptionActive
+                ]}
+              >
+                <Text style={[
+                  styles.timeOptionText,
+                  editCustomStart === time && styles.timeOptionTextActive
+                ]}>
+                  {time}
+                </Text>
+              </TouchableOpacity>
+            ))
+          )}
+        </ScrollView>
+      </View>
+    </View>
+
+    <View style={{ marginBottom: 12 }}>
+      <Text style={styles.inputLabel}>End Time (Auto-calculated)</Text>
+      <View style={styles.disabledInput}>
+        <Text style={{ color: COLORS.dim }}>
+          {editCustomEnd || "Will be calculated automatically"}
+        </Text>
+      </View>
+    </View>
+
+    {editCustomStart && editCustomEnd && (
+      <Text style={{ fontSize: 12, color: COLORS.dim, marginTop: 8 }}>
+        Duration: {getServiceDuration(selectedEdit.serviceCode)} minutes
+      </Text>
+    )}
+  </View>
+)}
               </View>
             )}
 
@@ -1174,46 +1240,76 @@ export default function PatientAppointmentsScreen() {
                   </TouchableOpacity>
 
                   {showCreateCustomTime && (
-                    <>
-                      <Text style={{ color: COLORS.dim, fontSize: 12, marginTop: 8 }}>
-                        Available ranges: {findAvailableTimeRanges(createDate).join(", ")}
-                      </Text>
-                      
-                      <View style={{ marginTop: 12 }}>
-                        <Text style={styles.inputLabel}>Start Time</Text>
-                        <ScrollView style={styles.timeScroll} nestedScrollEnabled>
-                          {generateTimeOptions().map(t => (
-                            <TouchableOpacity
-                              key={t}
-                              onPress={() => setCreateCustomStart(t)}
-                              style={[styles.timeOption, createCustomStart === t && styles.timeOptionActive]}
-                            >
-                              <Text style={[styles.timeOptionText, createCustomStart === t && styles.timeOptionTextActive]}>
-                                {t}
-                              </Text>
-                            </TouchableOpacity>
-                          ))}
-                        </ScrollView>
-                      </View>
+  <View style={styles.customTimeContainer}>
+    <Text style={styles.customTimeTitle}>Custom Time Slot</Text>
 
-                      <View style={{ marginTop: 12 }}>
-                        <Text style={styles.inputLabel}>End Time</Text>
-                        <ScrollView style={styles.timeScroll} nestedScrollEnabled>
-                          {generateTimeOptions().map(t => (
-                            <TouchableOpacity
-                              key={t}
-                              onPress={() => setCreateCustomEnd(t)}
-                              style={[styles.timeOption, createCustomEnd === t && styles.timeOptionActive]}
-                            >
-                              <Text style={[styles.timeOptionText, createCustomEnd === t && styles.timeOptionTextActive]}>
-                                {t}
-                              </Text>
-                            </TouchableOpacity>
-                          ))}
-                        </ScrollView>
-                      </View>
-                    </>
-                  )}
+    <View style={styles.availableTimeContainer}>
+      <Text style={styles.availableTimeLabel}>Available Time Today:</Text>
+      {findAvailableTimeRanges(createDate).map((range, idx) => (
+        <Text key={idx} style={styles.availableTimeText}>{range}</Text>
+      ))}
+    </View>
+
+    <View style={{ marginBottom: 12 }}>
+      <Text style={styles.inputLabel}>Start Time</Text>
+      <View style={styles.pickerContainer}>
+        <ScrollView style={styles.timePicker} nestedScrollEnabled>
+          {filterTimeOptionsByAvailableRanges(
+            findAvailableTimeRanges(createDate),
+            createServiceCode
+          ).length === 0 ? (
+            <View style={{ padding: 12 }}>
+              <Text style={{ color: COLORS.dim, textAlign: "center" }}>
+                No available time slots
+              </Text>
+            </View>
+          ) : (
+            filterTimeOptionsByAvailableRanges(
+              findAvailableTimeRanges(createDate),
+              createServiceCode
+            ).map(time => (
+              <TouchableOpacity
+                key={time}
+                onPress={() => {
+                  setCreateCustomStart(time);
+                  const duration = getServiceDuration(createServiceCode);
+                  const end = calculateEndTime(time, duration);
+                  setCreateCustomEnd(end);
+                }}
+                style={[
+                  styles.timeOption,
+                  createCustomStart === time && styles.timeOptionActive
+                ]}
+              >
+                <Text style={[
+                  styles.timeOptionText,
+                  createCustomStart === time && styles.timeOptionTextActive
+                ]}>
+                  {time}
+                </Text>
+              </TouchableOpacity>
+            ))
+          )}
+        </ScrollView>
+      </View>
+    </View>
+
+    <View style={{ marginBottom: 12 }}>
+      <Text style={styles.inputLabel}>End Time (Auto-calculated)</Text>
+      <View style={styles.disabledInput}>
+        <Text style={{ color: COLORS.dim }}>
+          {createCustomEnd || "Will be calculated automatically"}
+        </Text>
+      </View>
+    </View>
+
+    {createCustomStart && createCustomEnd && (
+      <Text style={{ fontSize: 12, color: COLORS.dim, marginTop: 8 }}>
+        Duration: {getServiceDuration(createServiceCode)} minutes
+      </Text>
+    )}
+  </View>
+)}
                 </View>
               )}
 
@@ -1249,6 +1345,25 @@ function DetailRow({ label, value }: { label: string; value: string }) {
     </View>
   );
 }
+
+const getServiceDuration = (code: string): number => {
+  const durations: Record<string, number> = {
+    B1: 60, B2: 50, C1: 60, C2: 25, D1: 60, D2: 25, E1: 140, F1: 75,
+  };
+  return durations[code] || 60;
+};
+
+
+
+const calculateEndTime = (startTime: string, durationMinutes: number): string => {
+  const [hours, minutes] = startTime.split(':').map(Number);
+  const totalMinutes = hours * 60 + minutes + durationMinutes;
+  const endHours = Math.floor(totalMinutes / 60) % 24;
+  const endMinutes = totalMinutes % 60;
+  return `${endHours.toString().padStart(2, '0')}:${endMinutes.toString().padStart(2, '0')}`;
+};
+
+
 
 // Styles
 const styles = StyleSheet.create({
@@ -1329,6 +1444,50 @@ const styles = StyleSheet.create({
     fontSize: 12,
     paddingVertical: 6,
   },
+  
+customTimeContainer: {
+  marginTop: 12,
+  padding: 12,
+  backgroundColor: "#F9FBFA",
+  borderRadius: 10,
+  borderWidth: 1,
+  borderColor: COLORS.line,
+},
+customTimeTitle: {
+  fontSize: 14,
+  fontWeight: "700",
+  color: COLORS.text,
+  marginBottom: 12,
+},
+availableTimeContainer: {
+  padding: 12,
+  backgroundColor: COLORS.card,
+  borderRadius: 8,
+  marginBottom: 12,
+},
+availableTimeLabel: {
+  fontSize: 12,
+  fontWeight: "700",
+  color: COLORS.dim,
+  marginBottom: 8,
+},
+availableTimeText: {
+  fontSize: 12,
+  color: "#16a34a",
+  marginBottom: 4,
+},
+pickerContainer: {
+  backgroundColor: COLORS.card,
+  borderRadius: 8,
+  borderWidth: 1,
+  borderColor: COLORS.line,
+  maxHeight: 150,
+},
+timePicker: {
+  maxHeight: 150,
+},
+timeOptionActive: { backgroundColor: COLORS.accent },
+timeOptionTextActive: { color: "white", fontWeight: "700" },
   calCell: {
     width: "13%",
     aspectRatio: 1,
@@ -1407,9 +1566,9 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: COLORS.line,
   },
-  timeOptionActive: { backgroundColor: COLORS.accent },
+ 
   timeOptionText: { fontSize: 14, color: COLORS.text },
-  timeOptionTextActive: { color: "white", fontWeight: "700" },
+  
   serviceBtn: {
     paddingHorizontal: 12,
     paddingVertical: 8,
