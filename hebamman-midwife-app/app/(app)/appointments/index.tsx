@@ -12,6 +12,7 @@ import {
   View,
 } from "react-native";
 import { useAuth } from "@/context/AuthContext";
+import BulkCancelAppointments from "@/components/BulkCancelAppointments";
 import { api } from "@/lib/api";
 import { useMidwifeProfile } from "@/hooks/useMidwifeProfile";
 
@@ -325,6 +326,7 @@ export default function AppointmentsScreen() {
   const [reactivateCalendarMonth, setReactivateCalendarMonth] = useState<Date>(new Date());
 
   const [metaInfo, setMetaInfo] = useState<{ monthsFound?: number; totalDocs?: number } | null>(null);
+const [showBulkCancelModal, setShowBulkCancelModal] = useState(false);
 
   // Status filter
   const [statusFilter, setStatusFilter] = useState<string>("all");
@@ -1018,7 +1020,7 @@ export default function AppointmentsScreen() {
         <Text style={styles.title}>Appointments</Text>
 
         {/* Tabs + reload */}
-        <View style={styles.tabsWrap}>
+      <View style={styles.tabsWrap}>
           <View style={styles.tabs}>
             <TouchableOpacity onPress={() => setTab("list")} style={[styles.tabBtn, tab === "list" && styles.tabActive]}>
               <Text style={[styles.tabText, tab === "list" && styles.tabTextActive]}>List</Text>
@@ -1027,9 +1029,19 @@ export default function AppointmentsScreen() {
               <Text style={[styles.tabText, tab === "calendar" && styles.tabTextActive]}>Calendar</Text>
             </TouchableOpacity>
           </View>
-          <TouchableOpacity onPress={fetchMonthly} style={styles.reloadBtn}>
-            <Text style={styles.reloadText}>Reload</Text>
-          </TouchableOpacity>
+          
+          <View style={{ flexDirection: "row", gap: 8 }}>
+            <TouchableOpacity onPress={fetchMonthly} style={styles.reloadBtn}>
+              <Text style={styles.reloadText}>Reload</Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity 
+              onPress={() => setShowBulkCancelModal(true)} 
+              style={styles.bulkCancelBtn}
+            >
+              <Text style={styles.bulkCancelText}>Bulk Cancel</Text>
+            </TouchableOpacity>
+          </View>
         </View>
 
         <Text style={styles.metaText}>
@@ -1186,7 +1198,9 @@ export default function AppointmentsScreen() {
                     </TouchableOpacity>
                   )}
                 </View>
+                
               </View>
+              
             )}
           />
         </>
@@ -1798,7 +1812,18 @@ export default function AppointmentsScreen() {
           </View>
         </View>
       </Modal>
+           {/* Bulk Cancel Modal */}
+      <BulkCancelAppointments
+        visible={showBulkCancelModal}
+        onClose={() => setShowBulkCancelModal(false)}
+        midwifeId={midwifeId}
+        allAppointments={allAppointments}
+        onSuccess={fetchMonthly}
+        getPatientName={getPatientName}
+      />
+  
     </View>
+    
   );
 }
 
@@ -2499,6 +2524,18 @@ const styles = StyleSheet.create({
     color: "white",
     fontSize: 15,
     fontWeight: "700",
+  },
+   bulkCancelBtn: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: "#DC2626",
+    backgroundColor: "transparent",
+  },
+  bulkCancelText: { 
+    color: "#DC2626", 
+    fontWeight: "800" 
   },
   cancelAppointmentInfo: {
     backgroundColor: COLORS.bg,
