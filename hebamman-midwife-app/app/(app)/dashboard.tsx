@@ -65,7 +65,8 @@ type Patient = {
   fullName: string;
   email: string;
   phoneNumber: string;
-  status: "pending" | "converted" | "cancelled";
+  clientStatus: "pending" | "converted" | "cancelled";
+  status: "pending" | "active" | "cancelled";
 };
 
 type MonthKey = string;
@@ -208,16 +209,16 @@ export default function Dashboard() {
   }, [midwifeId, fetchPatients]);
 
   // Active patients count (converted status)
-  const activePatientsCount = useMemo(() => {
-    return patients.filter(p => p.status === "converted").length;
-  }, [patients]);
+const activePatientsCount = useMemo(() => {
+  return patients.filter(p => p.clientStatus === "converted").length;
+}, [patients]);
 
   // Latest 5 active patients
-  const activePatients5 = useMemo(() => {
-    return patients
-      .filter(p => p.status === "converted")
-      .slice(0, 5);
-  }, [patients]);
+const activePatients5 = useMemo(() => {
+  return patients
+    .filter(p => p.clientStatus === "converted")
+    .slice(0, 5);
+}, [patients]);
 
   // Fetch appointments
   const clientET = useMemo(() => new Date(), []);

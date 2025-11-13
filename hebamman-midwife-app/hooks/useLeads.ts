@@ -13,15 +13,16 @@ export type Lead = {
   insuranceNumber?: string;
   insuranceCompany?: string;
   insuranceType?: "government" | "private" | string;
-  date: string; // "dd/MM/yyyy"
-  expectedDeliveryDate?: string; // "dd/MM/yyyy"
+  date: string;
+  expectedDeliveryDate?: string;
   selectedAddressDetails?: {
     address?: string;
     details?: { formattedAddress?: string };
   } & Record<string, any>;
-  selectedSlot?: string; // "13:50-14:40"
-  status?: "pending" | "completed" | string;
-  createdAt?: string; // ISO
+  selectedSlot?: string;
+  clientStatus: "pending" | "converted" | "cancelled";  // Added
+  status: "pending" | "active" | "cancelled";  // Added
+  createdAt?: string;
 };
 
 type LeadsResponse =

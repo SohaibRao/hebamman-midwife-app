@@ -49,14 +49,15 @@ type Patient = {
     secondaryText: string;
   };
   selectedSlot: string;
-  status: "pending" | "converted" | "cancelled";
+  clientStatus: "pending" | "converted" | "cancelled"; // Client/Lead status
+  status: "pending" | "active" | "cancelled"; // Appointment status
   createdAt: string;
 };
 
 type FilterType = "all" | "pending" | "converted" | "cancelled";
 
-// Helper functions for status styling
-const getStatusBadgeStyle = (status: string) => {
+// Helper functions for client status styling
+const getClientStatusBadgeStyle = (status: string) => {
   return {
     paddingHorizontal: 10,
     paddingVertical: 6,
@@ -70,13 +71,41 @@ const getStatusBadgeStyle = (status: string) => {
   };
 };
 
-const getStatusTextStyle = (status: string) => {
+const getClientStatusTextStyle = (status: string) => {
   return {
     fontSize: 11,
     fontWeight: "700" as const,
     color:
       status === "converted"
         ? "#065F46"
+        : status === "pending"
+        ? "#92400E"
+        : "#991B1B",
+  };
+};
+
+// Helper functions for appointment status styling (optional - different colors)
+const getAppointmentStatusBadgeStyle = (status: string) => {
+  return {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 12,
+    backgroundColor:
+      status === "active"
+        ? "#DBEAFE"  // Blue
+        : status === "pending"
+        ? "#FEF3C7"  // Yellow
+        : "#FEE2E2",  // Red
+  };
+};
+
+const getAppointmentStatusTextStyle = (status: string) => {
+  return {
+    fontSize: 11,
+    fontWeight: "700" as const,
+    color:
+      status === "active"
+        ? "#1E40AF"
         : status === "pending"
         ? "#92400E"
         : "#991B1B",
@@ -128,19 +157,19 @@ export default function PatientsScreen() {
     }
   }, [pf.status, midwifeId]);
 
-  // Filter patients
+  // Filter patients by clientStatus
   const filteredPatients = useMemo(() => {
     if (filter === "all") return patients;
-    return patients.filter(p => p.status === filter);
+    return patients.filter(p => p.clientStatus === filter);
   }, [patients, filter]);
 
-  // Get counts
+  // Get counts by clientStatus
   const counts = useMemo(() => {
     return {
       all: patients.length,
-      pending: patients.filter(p => p.status === "pending").length,
-      converted: patients.filter(p => p.status === "converted").length,
-      cancelled: patients.filter(p => p.status === "cancelled").length,
+      pending: patients.filter(p => p.clientStatus === "pending").length,
+      converted: patients.filter(p => p.clientStatus === "converted").length,
+      cancelled: patients.filter(p => p.clientStatus === "cancelled").length,
     };
   }, [patients]);
 
@@ -266,9 +295,9 @@ export default function PatientsScreen() {
                 </Text>
               </View>
               
-              <View style={getStatusBadgeStyle(item.status)}>
-                <Text style={getStatusTextStyle(item.status)}>
-                  {item.status.charAt(0).toUpperCase() + item.status.slice(1)}
+              <View style={getClientStatusBadgeStyle(item.clientStatus)}>
+                <Text style={getClientStatusTextStyle(item.clientStatus)}>
+                  {item.clientStatus.charAt(0).toUpperCase() + item.clientStatus.slice(1)}
                 </Text>
               </View>
             </TouchableOpacity>
@@ -299,11 +328,23 @@ export default function PatientsScreen() {
                   <DetailRow label="Name" value={selectedPatient.fullName} />
                   <DetailRow label="Email" value={selectedPatient.email} />
                   <DetailRow label="Phone" value={selectedPatient.phoneNumber} />
+                  
+                  {/* Client Status */}
                   <View style={styles.detailRow}>
-                    <Text style={styles.detailLabel}>Status:</Text>
-                    <View style={getStatusBadgeStyle(selectedPatient.status)}>
-                      <Text style={getStatusTextStyle(selectedPatient.status)}>
-                        {selectedPatient.status}
+                    <Text style={styles.detailLabel}>Client Status:</Text>
+                    <View style={getClientStatusBadgeStyle(selectedPatient.clientStatus)}>
+                      <Text style={getClientStatusTextStyle(selectedPatient.clientStatus)}>
+                        {selectedPatient.clientStatus.toUpperCase()}
+                      </Text>
+                    </View>
+                  </View>
+                  
+                  {/* Appointment Status */}
+                  <View style={styles.detailRow}>
+                    <Text style={styles.detailLabel}>Appointment:</Text>
+                    <View style={getAppointmentStatusBadgeStyle(selectedPatient.status)}>
+                      <Text style={getAppointmentStatusTextStyle(selectedPatient.status)}>
+                        {selectedPatient.status.toUpperCase()}
                       </Text>
                     </View>
                   </View>
@@ -330,7 +371,7 @@ export default function PatientsScreen() {
                   </Text>
                 </View>
 
-                {selectedPatient.status === "converted" && (
+                {selectedPatient.clientStatus === "converted" && (
                   <View style={styles.actionSection}>
                     <TouchableOpacity
                       style={styles.actionBtn}
