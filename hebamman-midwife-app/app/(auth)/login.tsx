@@ -1,3 +1,4 @@
+// app/(auth)/login.tsx
 import { useState, useEffect } from "react";
 import { useRouter } from "expo-router";
 import { Link } from "expo-router";
@@ -16,9 +17,9 @@ import {
 import { useAuth } from "@/context/AuthContext";
 
 const COLORS = {
-  sage: "#7F9086", // header/background tint (from your site)
+  sage: "#7F9086",
   sageDark: "#6F8076",
-  btn: "#2E5A49", // CTA green similar to "Jetzt Beratung vereinbaren"
+  btn: "#2E5A49",
   text: "#1D1D1F",
   dim: "#5C6B63",
   card: "#FFFFFF",
@@ -32,13 +33,12 @@ export default function LoginScreen() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
 
-
-  // ⬅️ redirect once signed in
   useEffect(() => {
     if (status === "signed-in") {
       router.replace("/(app)/dashboard");
     }
   }, [status, router]);
+
   const disabled = !email || !password || status === "signing-in";
 
   const onSubmit = () => {
@@ -51,10 +51,9 @@ export default function LoginScreen() {
         behavior={Platform.OS === "ios" ? "padding" : undefined}
         style={{ flex: 1 }}
       >
-        {/* Hero header w/ brand tone */}
+        {/* Hero header */}
         <View style={styles.hero}>
           <Image
-            // Simple placeholder logo (you can replace with local asset)
             source={{ uri: "https://placehold.co/160x160?text=hb" }}
             style={styles.logo}
           />
@@ -94,34 +93,32 @@ export default function LoginScreen() {
             onSubmitEditing={onSubmit}
           />
 
-          {!!error && <Text style={styles.error}>{error}</Text>}
+          {/* Forgot Password Link */}
+          <View style={styles.forgotPasswordContainer}>
+            <Link href="/(auth)/forgot-password" asChild>
+              <TouchableOpacity>
+                <Text style={styles.forgotPasswordText}>
+                  Passwort vergessen?
+                </Text>
+              </TouchableOpacity>
+            </Link>
+          </View>
+
+          {error && (
+            <Text style={styles.error}>{error}</Text>
+          )}
 
           <TouchableOpacity
-            disabled={disabled}
+            style={[styles.btn, disabled && styles.btnDisabled]}
             onPress={onSubmit}
-            style={[styles.button, disabled && { opacity: 0.6 }]}
+            disabled={disabled}
           >
             {status === "signing-in" ? (
-              <ActivityIndicator />
+              <ActivityIndicator color={COLORS.card} />
             ) : (
-              <Text style={styles.buttonText}>Einloggen</Text>
+              <Text style={styles.btnText}>Anmelden</Text>
             )}
           </TouchableOpacity>
-
-          {/* Optional links */}
-          <View style={{ marginTop: 16, alignItems: "center" }}>
-            <Text style={{ color: COLORS.dim }}>
-              Brauchen Sie Hilfe?{" "}
-              <Text style={{ color: COLORS.sageDark }}>Kontakt</Text>
-            </Text>
-          </View>
-        </View>
-
-        {/* Footer */}
-        <View style={{ alignItems: "center", marginTop: 18 }}>
-          <Text style={{ color: COLORS.dim, fontSize: 12 }}>
-            © {new Date().getFullYear()} hebammenbüro
-          </Text>
         </View>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -130,71 +127,83 @@ export default function LoginScreen() {
 
 const styles = StyleSheet.create({
   hero: {
-    paddingHorizontal: 24,
-    paddingTop: 24,
-    paddingBottom: 12,
     alignItems: "center",
+    paddingVertical: 40,
+    backgroundColor: COLORS.sage + "15",
   },
   logo: {
-    width: 80,
-    height: 80,
-    borderRadius: 16,
-    marginBottom: 8,
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    marginBottom: 12,
   },
   brand: {
     fontSize: 28,
     fontWeight: "800",
     color: COLORS.text,
-    letterSpacing: 0.5,
+    marginBottom: 4,
   },
   tagline: {
-    marginTop: 4,
+    fontSize: 14,
     color: COLORS.dim,
+    textAlign: "center",
   },
   card: {
+    flex: 1,
     backgroundColor: COLORS.card,
-    marginHorizontal: 16,
-    borderRadius: 16,
-    padding: 18,
-    shadowColor: "#000",
-    shadowOpacity: 0.06,
-    shadowRadius: 10,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 2,
+    borderTopLeftRadius: 32,
+    borderTopRightRadius: 32,
+    marginTop: 20,
+    padding: 24,
   },
   cardTitle: {
-    fontSize: 20,
-    fontWeight: "700",
+    fontSize: 26,
+    fontWeight: "800",
     color: COLORS.text,
-    marginBottom: 12,
+    marginBottom: 24,
   },
   label: {
     fontSize: 14,
-    color: COLORS.dim,
-    marginBottom: 6,
+    fontWeight: "700",
+    color: COLORS.text,
+    marginBottom: 8,
   },
   input: {
     backgroundColor: COLORS.input,
     borderRadius: 12,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
     fontSize: 16,
     color: COLORS.text,
   },
-  button: {
-    backgroundColor: COLORS.btn,
-    borderRadius: 14,
-    paddingVertical: 14,
-    alignItems: "center",
-    marginTop: 16,
+  forgotPasswordContainer: {
+    alignItems: "flex-end",
+    marginTop: 12,
+    marginBottom: 24,
   },
-  buttonText: {
-    color: "white",
-    fontSize: 16,
-    fontWeight: "700",
+  forgotPasswordText: {
+    fontSize: 14,
+    color: COLORS.btn,
+    fontWeight: "600",
   },
   error: {
     color: COLORS.danger,
+    fontSize: 14,
+    marginBottom: 16,
+  },
+  btn: {
+    backgroundColor: COLORS.btn,
+    borderRadius: 12,
+    paddingVertical: 16,
+    alignItems: "center",
     marginTop: 8,
+  },
+  btnDisabled: {
+    backgroundColor: COLORS.dim,
+  },
+  btnText: {
+    color: COLORS.card,
+    fontSize: 16,
+    fontWeight: "700",
   },
 });
