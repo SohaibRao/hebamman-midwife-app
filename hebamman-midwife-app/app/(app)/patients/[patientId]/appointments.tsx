@@ -2,6 +2,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
   FlatList,
   Modal,
   ScrollView,
@@ -38,6 +39,8 @@ type Apt = {
   serviceCode: string;
   classNo?: string;
   dateObj: Date;
+  midwifeId: string;
+  clientId: string;
 };
 
 type TimeSlot = {
@@ -106,6 +109,28 @@ const weekdayName = (d: Date) => DAY_NAMES[d.getDay()];
 
 const codeColor = (code: string) => SERVICE_COLORS[code] ?? COLORS.sage;
 
+// Get status badge style
+const getStatusBadgeStyle = (status?: string) => {
+  const normalizedStatus = status?.toLowerCase() || "active";
+  
+  const styles: Record<string, any> = {
+    active: {
+      backgroundColor: "#D1FAE5",
+      color: "#065F46",
+    },
+    pending: {
+      backgroundColor: "#FEF3C7",
+      color: "#92400E",
+    },
+    cancelled: {
+      backgroundColor: "#FEE2E2",
+      color: "#991B1B",
+    },
+  };
+  
+  return styles[normalizedStatus] || styles.active;
+};
+
 const parseTime = (time: string): number => {
   const [hours, minutes] = time.split(':').map(Number);
   return hours * 60 + minutes;
@@ -121,7 +146,20 @@ async function readJsonSafe<T = any>(res: Response): Promise<T> {
   }
 }
 
+const getServiceDuration = (code: string): number => {
+  const durations: Record<string, number> = {
+    B1: 60, B2: 50, C1: 60, C2: 25, D1: 60, D2: 25, E1: 140, F1: 75,
+  };
+  return durations[code] || 60;
+};
 
+const calculateEndTime = (startTime: string, durationMinutes: number): string => {
+  const [hours, minutes] = startTime.split(':').map(Number);
+  const totalMinutes = hours * 60 + minutes + durationMinutes;
+  const endHours = Math.floor(totalMinutes / 60) % 24;
+  const endMinutes = totalMinutes % 60;
+  return `${endHours.toString().padStart(2, '0')}:${endMinutes.toString().padStart(2, '0')}`;
+};
 
 // -------------------- Main Component --------------------
 export default function PatientAppointmentsScreen() {
@@ -147,6 +185,9 @@ export default function PatientAppointmentsScreen() {
   const [selectedDetails, setSelectedDetails] = useState<Apt | null>(null);
   const [detailsOpen, setDetailsOpen] = useState(false);
   
+  // Status filter
+  const [statusFilter, setStatusFilter] = useState<string>("all");
+  
   // Calendar selection
   const [selectedCalendarDate, setSelectedCalendarDate] = useState<Date | null>(null);
   
@@ -171,6 +212,19 @@ export default function PatientAppointmentsScreen() {
   const [editCustomEnd, setEditCustomEnd] = useState("");
   const [isUpdating, setIsUpdating] = useState(false);
   const [editCalendarDate, setEditCalendarDate] = useState(new Date());
+
+  // Cancel appointment states
+  const [showCancelConfirm, setShowCancelConfirm] = useState(false);
+  const [cancelingAppointment, setCancelingAppointment] = useState<Apt | null>(null);
+  const [isCanceling, setIsCanceling] = useState(false);
+
+  // Reactivate appointment states
+  const [showReactivateModal, setShowReactivateModal] = useState(false);
+  const [reactivatingAppointment, setReactivatingAppointment] = useState<Apt | null>(null);
+  const [reactivateDate, setReactivateDate] = useState<Date | null>(null);
+  const [reactivateSlot, setReactivateSlot] = useState<TimeSlot | null>(null);
+  const [isReactivating, setIsReactivating] = useState(false);
+  const [reactivateCalendarMonth, setReactivateCalendarMonth] = useState<Date>(new Date());
 
   // All appointments
   const allAppointments = useMemo(() => {
@@ -215,6 +269,8 @@ export default function PatientAppointmentsScreen() {
                 serviceCode,
                 classNo: apt.classNo,
                 dateObj: toDate(apt.appointmentDate),
+                midwifeId,
+                clientId,
               });
             });
           }
@@ -236,6 +292,8 @@ export default function PatientAppointmentsScreen() {
                 serviceCode,
                 classNo: apt.classNo,
                 dateObj: toDate(apt.appointmentDate),
+                midwifeId,
+                clientId,
               });
             });
           }
@@ -255,13 +313,46 @@ export default function PatientAppointmentsScreen() {
     fetchAppointments();
   }, [fetchAppointments]);
 
-  // Month appointments
+  // Calculate status counts for current month
+  const statusCounts = useMemo(() => {
+    const start = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
+    const end = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0);
+    const monthApts = allAppointments.filter(apt => apt.dateObj >= start && apt.dateObj <= end);
+    
+    return {
+      all: monthApts.length,
+      active: monthApts.filter((a) => {
+        const status = a.status?.toLowerCase() || "active";
+        return status === "active";
+      }).length,
+      pending: monthApts.filter((a) => {
+        const status = a.status?.toLowerCase() || "active";
+        return status === "pending";
+      }).length,
+      cancelled: monthApts.filter((a) => {
+        const status = a.status?.toLowerCase() || "active";
+        return status === "cancelled";
+      }).length,
+    };
+  }, [allAppointments, currentDate]);
+
+  // Month appointments with status filter
   const monthAppointments = useMemo(() => {
     const start = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
     const end = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0);
     
-    return allAppointments.filter(apt => apt.dateObj >= start && apt.dateObj <= end);
-  }, [allAppointments, currentDate]);
+    let filtered = allAppointments.filter(apt => apt.dateObj >= start && apt.dateObj <= end);
+    
+    // Apply status filter
+    if (statusFilter !== "all") {
+      filtered = filtered.filter((a) => {
+        const aptStatus = a.status?.toLowerCase() || "active";
+        return aptStatus === statusFilter;
+      });
+    }
+    
+    return filtered;
+  }, [allAppointments, currentDate, statusFilter]);
 
   // Calendar days
   const calendarDays = useMemo(() => {
@@ -302,22 +393,6 @@ export default function PatientAppointmentsScreen() {
   // Available service codes (F1 excluded from creation)
   const availableServiceCodes = ["B1", "B2", "C1", "C2", "D1", "D2"];
 
-  // Service duration
-  const getServiceDuration = (code: string): number => {
-    const durations: Record<string, number> = {
-      B1: 60, B2: 50, C1: 60, C2: 25, D1: 60, D2: 25, F1: 75,
-    };
-    return durations[code] || 60;
-  };
-
-  const calculateEndTime = (start: string, duration: number): string => {
-    const [h, m] = start.split(':').map(Number);
-    const total = h * 60 + m + duration;
-    const eh = Math.floor(total / 60) % 24;
-    const em = total % 60;
-    return `${String(eh).padStart(2, '0')}:${String(em).padStart(2, '0')}`;
-  };
-
   const generateTimeOptions = (): string[] => {
     const times: string[] = [];
     for (let h = 0; h < 24; h++) {
@@ -357,94 +432,91 @@ export default function PatientAppointmentsScreen() {
   }, [timetable, apptsByDay]);
 
   // Find available time ranges
-const findAvailableTimeRanges = useCallback((date: Date): string[] => {
-  if (!timetable) return ["00:00 - 23:59 available"];
+  const findAvailableTimeRanges = useCallback((date: Date): string[] => {
+    if (!timetable) return ["00:00 - 23:59 available"];
 
-  const dayName = weekdayName(date);
-  const daySlots = timetable[dayName];
-  if (!daySlots?.slots) return ["00:00 - 23:59 available"];
+    const dayName = weekdayName(date);
+    const daySlots = timetable[dayName];
+    if (!daySlots?.slots) return ["00:00 - 23:59 available"];
 
-  const busySlots: { start: number; end: number }[] = [];
+    const busySlots: { start: number; end: number }[] = [];
 
-  // Add all timetable slots as busy
-  Object.values(daySlots.slots).forEach((serviceSlots: any) => {
-    if (Array.isArray(serviceSlots)) {
-      serviceSlots.forEach((slot: TimeSlot) => {
-        busySlots.push({
-          start: parseTime(slot.startTime),
-          end: parseTime(slot.endTime)
+    Object.values(daySlots.slots).forEach((serviceSlots: any) => {
+      if (Array.isArray(serviceSlots)) {
+        serviceSlots.forEach((slot: TimeSlot) => {
+          busySlots.push({
+            start: parseTime(slot.startTime),
+            end: parseTime(slot.endTime)
+          });
         });
-      });
-    }
-  });
-
-  // Add all booked appointments as busy
-  const dateKey = toDMY(date);
-  const dayApts = apptsByDay[dateKey] ?? [];
-  dayApts.forEach(apt => {
-    busySlots.push({
-      start: parseTime(apt.startTime),
-      end: parseTime(apt.endTime)
-    });
-  });
-
-  // Sort and merge overlapping slots
-  busySlots.sort((a, b) => a.start - b.start);
-  const mergedBusy: { start: number; end: number }[] = [];
-
-  busySlots.forEach(slot => {
-    if (mergedBusy.length === 0) {
-      mergedBusy.push(slot);
-    } else {
-      const last = mergedBusy[mergedBusy.length - 1];
-      if (slot.start <= last.end) {
-        last.end = Math.max(last.end, slot.end);
-      } else {
-        mergedBusy.push(slot);
       }
-    }
-  });
+    });
 
-  // Find free ranges
-  const freeRanges: string[] = [];
-  let currentTime = 0;
+    const dateKey = toDMY(date);
+    const dayApts = apptsByDay[dateKey] ?? [];
+    dayApts.forEach(apt => {
+      busySlots.push({
+        start: parseTime(apt.startTime),
+        end: parseTime(apt.endTime)
+      });
+    });
 
-  mergedBusy.forEach(busy => {
-    if (currentTime < busy.start) {
+    busySlots.sort((a, b) => a.start - b.start);
+    const mergedBusy: { start: number; end: number }[] = [];
+
+    busySlots.forEach(slot => {
+      if (mergedBusy.length === 0) {
+        mergedBusy.push(slot);
+      } else {
+        const last = mergedBusy[mergedBusy.length - 1];
+        if (slot.start <= last.end) {
+          last.end = Math.max(last.end, slot.end);
+        } else {
+          mergedBusy.push(slot);
+        }
+      }
+    });
+
+    const freeRanges: string[] = [];
+    let currentTime = 0;
+
+    mergedBusy.forEach(busy => {
+      if (currentTime < busy.start) {
+        const startHour = Math.floor(currentTime / 60);
+        const startMin = currentTime % 60;
+        const endHour = Math.floor(busy.start / 60);
+        const endMin = busy.start % 60;
+        freeRanges.push(
+          `${String(startHour).padStart(2, '0')}:${String(startMin).padStart(2, '0')} - ${String(endHour).padStart(2, '0')}:${String(endMin).padStart(2, '0')} available`
+        );
+      }
+      currentTime = busy.end;
+    });
+
+    if (currentTime < 24 * 60) {
       const startHour = Math.floor(currentTime / 60);
       const startMin = currentTime % 60;
-      const endHour = Math.floor(busy.start / 60);
-      const endMin = busy.start % 60;
       freeRanges.push(
-        `${String(startHour).padStart(2, '0')}:${String(startMin).padStart(2, '0')} - ${String(endHour).padStart(2, '0')}:${String(endMin).padStart(2, '0')} available`
+        `${String(startHour).padStart(2, '0')}:${String(startMin).padStart(2, '0')} - 23:59 available`
       );
     }
-    currentTime = busy.end;
-  });
 
-  if (currentTime < 24 * 60) {
-    const startHour = Math.floor(currentTime / 60);
-    const startMin = currentTime % 60;
-    freeRanges.push(
-      `${String(startHour).padStart(2, '0')}:${String(startMin).padStart(2, '0')} - 23:59 available`
-    );
-  }
+    return freeRanges.length > 0 ? freeRanges : ["No free time available"];
+  }, [timetable, apptsByDay]);
 
-  return freeRanges.length > 0 ? freeRanges : ["No free time available"];
-}, [timetable, apptsByDay]);
   // Validate custom time
   const isCustomTimeValid = (startTime: string, endTime: string, date: Date): boolean => {
     const startMinutes = parseTime(startTime);
     const endMinutes = parseTime(endTime);
 
     if (endMinutes <= startMinutes) {
-      alert("End time must be after start time");
+      Alert.alert("Error", "End time must be after start time");
       return false;
     }
 
     const ranges = findAvailableTimeRanges(date);
     if (ranges[0] === "No free time available") {
-      alert("No free time available on this date");
+      Alert.alert("Error", "No free time available on this date");
       return false;
     }
 
@@ -459,40 +531,39 @@ const findAvailableTimeRanges = useCallback((date: Date): string[] => {
       }
     }
 
-    alert("Selected time is not within available time ranges");
+    Alert.alert("Error", "Selected time is not within available time ranges");
     return false;
   };
 
-  
-const filterTimeOptionsByAvailableRanges = useCallback((ranges: string[], serviceCode: string): string[] => {
-  if (ranges[0] === "No free time available") return [];
-  
-  const allTimes = generateTimeOptions();
-  const availableTimes: string[] = [];
-  
-  ranges.forEach(range => {
-    const match = range.match(/(\d{2}):(\d{2}) - (\d{2}):(\d{2})/);
-    if (match) {
-      const rangeStart = `${match[1]}:${match[2]}`;
-      const rangeEnd = `${match[3]}:${match[4]}`;
-      
-      const startMinutes = parseTime(rangeStart);
-      const endMinutes = parseTime(rangeEnd);
-      
-      allTimes.forEach(time => {
-        const timeMinutes = parseTime(time);
-        const duration = getServiceDuration(serviceCode);
-        const endTimeMinutes = timeMinutes + duration;
+  const filterTimeOptionsByAvailableRanges = useCallback((ranges: string[], serviceCode: string): string[] => {
+    if (ranges[0] === "No free time available") return [];
+    
+    const allTimes = generateTimeOptions();
+    const availableTimes: string[] = [];
+    
+    ranges.forEach(range => {
+      const match = range.match(/(\d{2}):(\d{2}) - (\d{2}):(\d{2})/);
+      if (match) {
+        const rangeStart = `${match[1]}:${match[2]}`;
+        const rangeEnd = `${match[3]}:${match[4]}`;
         
-        if (timeMinutes >= startMinutes && endTimeMinutes <= endMinutes) {
-          availableTimes.push(time);
-        }
-      });
-    }
-  });
-  
-  return availableTimes;
-}, []);
+        const startMinutes = parseTime(rangeStart);
+        const endMinutes = parseTime(rangeEnd);
+        
+        allTimes.forEach(time => {
+          const timeMinutes = parseTime(time);
+          const duration = getServiceDuration(serviceCode);
+          const endTimeMinutes = timeMinutes + duration;
+          
+          if (timeMinutes >= startMinutes && endTimeMinutes <= endMinutes) {
+            availableTimes.push(time);
+          }
+        });
+      }
+    });
+    
+    return availableTimes;
+  }, []);
 
   // Generate calendar days for modals
   const getCalendarDays = (month: Date) => {
@@ -521,6 +592,12 @@ const filterTimeOptionsByAvailableRanges = useCallback((ranges: string[], servic
     if (!createServiceCode || !createDate) return [];
     return getAvailableTimeSlots(createDate, createServiceCode);
   }, [createServiceCode, createDate, getAvailableTimeSlots]);
+
+  // Available time slots for reactivate
+  const reactivateAvailableSlots = useMemo(() => {
+    if (!reactivatingAppointment || !reactivateDate) return [];
+    return getAvailableTimeSlots(reactivateDate, reactivatingAppointment.serviceCode);
+  }, [reactivatingAppointment, reactivateDate, getAvailableTimeSlots]);
 
   // Handlers
   const openDetails = (apt: Apt) => {
@@ -556,7 +633,7 @@ const filterTimeOptionsByAvailableRanges = useCallback((ranges: string[], servic
 
   const submitEdit = async () => {
     if (!selectedEdit || !editDate) {
-      alert("Please select a date");
+      Alert.alert("Error", "Please select a date");
       return;
     }
 
@@ -565,7 +642,7 @@ const filterTimeOptionsByAvailableRanges = useCallback((ranges: string[], servic
 
     if (showEditCustomTime) {
       if (!editCustomStart || !editCustomEnd) {
-        alert("Please select start time");
+        Alert.alert("Error", "Please select start time");
         return;
       }
       if (!isCustomTimeValid(editCustomStart, editCustomEnd, editDate)) return;
@@ -573,7 +650,7 @@ const filterTimeOptionsByAvailableRanges = useCallback((ranges: string[], servic
       endTime = editCustomEnd;
     } else {
       if (!editTimeSlot) {
-        alert("Please select a time slot");
+        Alert.alert("Error", "Please select a time slot");
         return;
       }
       startTime = editTimeSlot.startTime;
@@ -604,9 +681,9 @@ const filterTimeOptionsByAvailableRanges = useCallback((ranges: string[], servic
       await fetchAppointments();
       closeEdit();
       closeDetails();
-      alert("Appointment updated successfully!");
+      Alert.alert("Success", "Appointment updated successfully!");
     } catch (e: any) {
-      alert(e?.message ?? "Failed to update appointment");
+      Alert.alert("Error", e?.message ?? "Failed to update appointment");
     } finally {
       setIsUpdating(false);
     }
@@ -634,7 +711,7 @@ const filterTimeOptionsByAvailableRanges = useCallback((ranges: string[], servic
 
   const submitCreate = async () => {
     if (!createServiceCode || !createDate) {
-      alert("Please complete all fields");
+      Alert.alert("Error", "Please complete all fields");
       return;
     }
 
@@ -643,7 +720,7 @@ const filterTimeOptionsByAvailableRanges = useCallback((ranges: string[], servic
 
     if (showCreateCustomTime) {
       if (!createCustomStart || !createCustomEnd) {
-        alert("Please select start time");
+        Alert.alert("Error", "Please select start time");
         return;
       }
       if (!isCustomTimeValid(createCustomStart, createCustomEnd, createDate)) return;
@@ -651,7 +728,7 @@ const filterTimeOptionsByAvailableRanges = useCallback((ranges: string[], servic
       endTime = createCustomEnd;
     } else {
       if (!createTimeSlot) {
-        alert("Please select a time slot");
+        Alert.alert("Error", "Please select a time slot");
         return;
       }
       startTime = createTimeSlot.startTime;
@@ -680,11 +757,148 @@ const filterTimeOptionsByAvailableRanges = useCallback((ranges: string[], servic
 
       await fetchAppointments();
       closeCreateModal();
-      alert("Appointment created successfully!");
+      Alert.alert("Success", "Appointment created successfully!");
     } catch (e: any) {
-      alert(e?.message ?? "Failed to create appointment");
+      Alert.alert("Error", e?.message ?? "Failed to create appointment");
     } finally {
       setIsCreating(false);
+    }
+  };
+
+  // Cancel appointment handlers
+  const handleCancelAppointment = async () => {
+    if (!cancelingAppointment) return;
+    
+    setIsCanceling(true);
+    
+    try {
+      const body: any = {
+        appointmentId: cancelingAppointment.appointmentId,
+        serviceCode: cancelingAppointment.serviceCode,
+        midwifeId: cancelingAppointment.midwifeId,
+        clientId: cancelingAppointment.clientId,
+      };
+
+      const response = await api("/api/public/cancelAppointment", {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(body),
+      });
+
+      const result = await response.json();
+
+      if (response.ok && result.success) {
+        Alert.alert(
+          "Success",
+          result.message || "Appointment cancelled successfully"
+        );
+        
+        setShowCancelConfirm(false);
+        setCancelingAppointment(null);
+        closeDetails();
+        closeEdit();
+        
+        await fetchAppointments();
+      } else {
+        Alert.alert(
+          "Error",
+          result.error || result.details || "Failed to cancel appointment"
+        );
+      }
+    } catch (error: any) {
+      console.error("Cancel appointment error:", error);
+      Alert.alert("Error", "Something went wrong. Please try again.");
+    } finally {
+      setIsCanceling(false);
+    }
+  };
+
+  const openCancelConfirm = (apt: Apt) => {
+    setCancelingAppointment(apt);
+    setShowCancelConfirm(true);
+  };
+
+  const closeCancelConfirm = () => {
+    if (!isCanceling) {
+      setShowCancelConfirm(false);
+      setCancelingAppointment(null);
+    }
+  };
+
+  // Reactivate appointment handlers
+  const openReactivateModal = (apt: Apt) => {
+    setReactivatingAppointment(apt);
+    const aptDate = toDate(apt.appointmentDate);
+    setReactivateDate(aptDate);
+    setReactivateCalendarMonth(new Date(aptDate.getFullYear(), aptDate.getMonth(), 1));
+    setReactivateSlot({ startTime: apt.startTime, endTime: apt.endTime });
+    setShowReactivateModal(true);
+  };
+
+  const closeReactivateModal = () => {
+    if (!isReactivating) {
+      setShowReactivateModal(false);
+      setReactivatingAppointment(null);
+      setReactivateDate(null);
+      setReactivateSlot(null);
+    }
+  };
+
+  const handleReactivateAppointment = async () => {
+    if (!reactivatingAppointment || !reactivateDate || !reactivateSlot) {
+      Alert.alert("Error", "Please select a date and time slot");
+      return;
+    }
+
+    setIsReactivating(true);
+
+    try {
+      const body: any = {
+        appointmentId: reactivatingAppointment.appointmentId,
+        serviceCode: reactivatingAppointment.serviceCode,
+        updatedDate: toDMY(reactivateDate),
+        updatedStartTime: reactivateSlot.startTime,
+        updatedEndTime: reactivateSlot.endTime,
+        midwifeId: reactivatingAppointment.midwifeId,
+        clientId: reactivatingAppointment.clientId,
+      };
+
+      const response = await api("/api/public/reactivateAppointment", {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(body),
+      });
+
+      const result = await response.json();
+
+      if (response.ok && result.success) {
+        Alert.alert(
+          "Success",
+          result.message || "Appointment reactivated successfully"
+        );
+
+        setShowReactivateModal(false);
+        setReactivatingAppointment(null);
+        setReactivateDate(null);
+        setReactivateSlot(null);
+        closeDetails();
+
+        await fetchAppointments();
+      } else {
+        Alert.alert(
+          "Error",
+          result.error || result.details || "Failed to reactivate appointment"
+        );
+      }
+    } catch (error: any) {
+      console.error("Reactivate appointment error:", error);
+      Alert.alert("Error", "Something went wrong. Please try again.");
+    } finally {
+      setIsReactivating(false);
     }
   };
 
@@ -738,6 +952,76 @@ const filterTimeOptionsByAvailableRanges = useCallback((ranges: string[], servic
 
       {tab === "list" ? (
         <>
+          {/* Status Filter */}
+          <View style={{ paddingHorizontal: 16, paddingVertical: 12, backgroundColor: COLORS.card }}>
+            <Text style={{ fontSize: 14, fontWeight: "700", color: COLORS.dim, marginBottom: 8 }}>
+              Filter by Status
+            </Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+              <View style={{ flexDirection: "row", gap: 8 }}>
+                <TouchableOpacity
+                  onPress={() => setStatusFilter("all")}
+                  style={[
+                    styles.filterBtn,
+                    statusFilter === "all" && styles.filterBtnActive,
+                  ]}
+                >
+                  <Text style={[
+                    styles.filterBtnText,
+                    statusFilter === "all" && styles.filterBtnTextActive,
+                  ]}>
+                    All ({statusCounts.all})
+                  </Text>
+                </TouchableOpacity>
+                
+                <TouchableOpacity
+                  onPress={() => setStatusFilter("active")}
+                  style={[
+                    styles.filterBtn,
+                    statusFilter === "active" && styles.filterBtnActive,
+                  ]}
+                >
+                  <Text style={[
+                    styles.filterBtnText,
+                    statusFilter === "active" && styles.filterBtnTextActive,
+                  ]}>
+                    Active ({statusCounts.active})
+                  </Text>
+                </TouchableOpacity>
+                
+                <TouchableOpacity
+                  onPress={() => setStatusFilter("pending")}
+                  style={[
+                    styles.filterBtn,
+                    statusFilter === "pending" && styles.filterBtnActive,
+                  ]}
+                >
+                  <Text style={[
+                    styles.filterBtnText,
+                    statusFilter === "pending" && styles.filterBtnTextActive,
+                  ]}>
+                    Pending ({statusCounts.pending})
+                  </Text>
+                </TouchableOpacity>
+                
+                <TouchableOpacity
+                  onPress={() => setStatusFilter("cancelled")}
+                  style={[
+                    styles.filterBtn,
+                    statusFilter === "cancelled" && styles.filterBtnActive,
+                  ]}
+                >
+                  <Text style={[
+                    styles.filterBtnText,
+                    statusFilter === "cancelled" && styles.filterBtnTextActive,
+                  ]}>
+                    Cancelled ({statusCounts.cancelled})
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </ScrollView>
+          </View>
+
           <View style={styles.monthNav}>
             <TouchableOpacity
               onPress={() => setCurrentDate(d => new Date(d.getFullYear(), d.getMonth() - 1, 1))}
@@ -767,9 +1051,22 @@ const filterTimeOptionsByAvailableRanges = useCallback((ranges: string[], servic
               <TouchableOpacity onPress={() => openDetails(item)} style={styles.aptCard}>
                 <View style={[styles.colorDot, { backgroundColor: codeColor(item.serviceCode) }]} />
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.aptTitle}>
-                    {item.serviceCode} • {SERVICE_NAMES[item.serviceCode]}
-                  </Text>
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 4 }}>
+                    <Text style={styles.aptTitle}>
+                      {item.serviceCode} • {SERVICE_NAMES[item.serviceCode]}
+                    </Text>
+                    <View style={[
+                      styles.statusBadge,
+                      { backgroundColor: getStatusBadgeStyle(item.status).backgroundColor }
+                    ]}>
+                      <Text style={[
+                        styles.statusBadgeText,
+                        { color: getStatusBadgeStyle(item.status).color }
+                      ]}>
+                        {(item.status || "active").toUpperCase()}
+                      </Text>
+                    </View>
+                  </View>
                   <Text style={styles.aptSub}>
                     {fmtDateShort(item.dateObj)} • {item.startTime}–{item.endTime} • {item.duration}m
                   </Text>
@@ -852,9 +1149,22 @@ const filterTimeOptionsByAvailableRanges = useCallback((ranges: string[], servic
                     >
                       <View style={[styles.colorDot, { backgroundColor: codeColor(item.serviceCode) }]} />
                       <View style={{ flex: 1 }}>
-                        <Text style={styles.aptTitle}>
-                          {item.serviceCode} • {SERVICE_NAMES[item.serviceCode]}
-                        </Text>
+                        <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 4 }}>
+                          <Text style={styles.aptTitle}>
+                            {item.serviceCode} • {SERVICE_NAMES[item.serviceCode]}
+                          </Text>
+                          <View style={[
+                            styles.statusBadge,
+                            { backgroundColor: getStatusBadgeStyle(item.status).backgroundColor }
+                          ]}>
+                            <Text style={[
+                              styles.statusBadgeText,
+                              { color: getStatusBadgeStyle(item.status).color }
+                            ]}>
+                              {(item.status || "active").toUpperCase()}
+                            </Text>
+                          </View>
+                        </View>
                         <Text style={styles.aptSub}>
                           {item.startTime}–{item.endTime} • {item.duration}m
                         </Text>
@@ -868,47 +1178,306 @@ const filterTimeOptionsByAvailableRanges = useCallback((ranges: string[], servic
         </ScrollView>
       )}
 
-      {/* Details Modal */}
-      <Modal visible={detailsOpen} transparent animationType="fade" onRequestClose={closeDetails}>
-        <View style={styles.overlay}>
-          <View style={styles.modalCard}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Appointment Details</Text>
-              <TouchableOpacity onPress={closeDetails}>
-                <Text style={{ fontSize: 20, color: COLORS.dim, fontWeight: "800" }}>✕</Text>
+{/* Details Modal */}
+<Modal visible={detailsOpen} transparent animationType="fade" onRequestClose={closeDetails}>
+  <View style={styles.overlay}>
+    <View style={styles.modalCard}>
+      <View style={styles.modalHeader}>
+        <Text style={styles.modalTitle}>Appointment Details</Text>
+        <TouchableOpacity onPress={closeDetails}>
+          <Text style={{ fontSize: 20, color: COLORS.dim, fontWeight: "800" }}>✕</Text>
+        </TouchableOpacity>
+      </View>
+      
+      {selectedDetails && (
+        <>
+          <DetailRow label="Service" value={`${selectedDetails.serviceCode} - ${SERVICE_NAMES[selectedDetails.serviceCode]}`} />
+          <DetailRow label="Date" value={selectedDetails.appointmentDate} />
+          <DetailRow label="Time" value={`${selectedDetails.startTime} – ${selectedDetails.endTime}`} />
+          <DetailRow label="Duration" value={`${selectedDetails.duration} min`} />
+          <DetailRow label="Status" value={selectedDetails.status ?? "—"} />
+          
+          {selectedDetails.status?.toLowerCase() === "cancelled" ? (
+            // Show Reactivate button for cancelled appointments
+            <View style={{ flexDirection: "row", marginTop: 16, gap: 10 }}>
+              <TouchableOpacity
+                onPress={() => {
+                  closeDetails();
+                  if (selectedDetails) openReactivateModal(selectedDetails);
+                }}
+                style={[styles.modalBtn, { flex: 1, backgroundColor: "#16a34a" }]}
+              >
+                <Text style={styles.modalBtnText}>Reactivate</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                onPress={closeDetails} 
+                style={[styles.modalBtnSecondary, { flex: 1 }]}
+              >
+                <Text style={styles.modalBtnSecondaryText}>Close</Text>
               </TouchableOpacity>
             </View>
-            
-            {selectedDetails && (
-              <>
-                <DetailRow label="Service" value={`${selectedDetails.serviceCode} - ${SERVICE_NAMES[selectedDetails.serviceCode]}`} />
-                <DetailRow label="Date" value={selectedDetails.appointmentDate} />
-                <DetailRow label="Time" value={`${selectedDetails.startTime} – ${selectedDetails.endTime}`} />
-                <DetailRow label="Duration" value={`${selectedDetails.duration} min`} />
-                <DetailRow label="Status" value={selectedDetails.status ?? "—"} />
-                
-                <View style={{ flexDirection: "row", marginTop: 16, gap: 10 }}>
-                  <TouchableOpacity
-                    onPress={() => {
-                      const s = selectedDetails;
-                      closeDetails();
-                      openEdit(s);
-                    }}
-                    style={[styles.modalBtn, { flex: 1 }]}
-                  >
-                    <Text style={styles.modalBtnText}>Edit</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity onPress={closeDetails} style={[styles.modalBtnSecondary, { flex: 1 }]}>
-                    <Text style={styles.modalBtnSecondaryText}>Close</Text>
-                  </TouchableOpacity>
-                </View>
-              </>
-            )}
-          </View>
-        </View>
-      </Modal>
+          ) : (
+            // Show Edit and Cancel buttons for non-cancelled appointments
+            <View style={{ flexDirection: "row", marginTop: 16, gap: 10 }}>
+              <TouchableOpacity
+                onPress={() => {
+                  const s = selectedDetails;
+                  closeDetails();
+                  openEdit(s);
+                }}
+                style={[styles.modalBtn, { flex: 1 }]}
+              >
+                <Text style={styles.modalBtnText}>Edit</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => {
+                  closeDetails();
+                  if (selectedDetails) openCancelConfirm(selectedDetails);
+                }}
+                style={[styles.cancelBtn, { flex: 1 }]}
+              >
+                <Text style={styles.cancelBtnText}>Cancel</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+        </>
+      )}
+    </View>
+  </View>
+</Modal>
 
-      <Modal visible={editOpen} transparent animationType="fade" onRequestClose={closeEdit}>
+{/* Cancel Confirmation Modal */}
+<Modal
+  visible={showCancelConfirm}
+  transparent
+  animationType="fade"
+  onRequestClose={closeCancelConfirm}
+>
+  <View style={styles.overlay}>
+    <View style={[styles.modalCard, { maxWidth: 400 }]}>
+      <View style={styles.modalHeader}>
+        <Text style={styles.modalTitle}>Cancel Appointment</Text>
+      </View>
+
+      {cancelingAppointment && (
+        <>
+          <View style={{ paddingVertical: 12 }}>
+            <Text style={{ color: COLORS.text, marginBottom: 16, fontSize: 15 }}>
+              Are you sure you want to cancel this appointment?
+            </Text>
+
+            <View style={styles.cancelAppointmentInfo}>
+              <Text style={styles.cancelAppointmentTitle}>
+                {SERVICE_NAMES[cancelingAppointment.serviceCode] || cancelingAppointment.serviceCode}
+              </Text>
+              <Text style={styles.cancelAppointmentDetails}>
+                Date: {cancelingAppointment.appointmentDate}
+              </Text>
+              <Text style={styles.cancelAppointmentDetails}>
+                Time: {cancelingAppointment.startTime} - {cancelingAppointment.endTime}
+              </Text>
+              <Text style={styles.cancelAppointmentDetails}>
+                Duration: {cancelingAppointment.duration} minutes
+              </Text>
+            </View>
+
+            <View style={styles.warningBox}>
+              <Text style={styles.warningText}>
+                ⚠️ This action cannot be undone
+              </Text>
+            </View>
+          </View>
+
+          <View style={{ flexDirection: "row", gap: 10, marginTop: 16 }}>
+            <TouchableOpacity
+              onPress={closeCancelConfirm}
+              disabled={isCanceling}
+              style={[styles.modalBtnSecondary, { flex: 1 }]}
+            >
+              <Text style={styles.modalBtnSecondaryText}>Go Back</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={handleCancelAppointment}
+              disabled={isCanceling}
+              style={[styles.cancelBtn, { flex: 1 }, isCanceling && { opacity: 0.6 }]}
+            >
+              {isCanceling ? (
+                <ActivityIndicator color="white" size="small" />
+              ) : (
+                <Text style={styles.cancelBtnText}>
+                  Yes, Cancel It
+                </Text>
+              )}
+            </TouchableOpacity>
+          </View>
+        </>
+      )}
+    </View>
+  </View>
+</Modal>
+
+{/* Reactivate Appointment Modal */}
+<Modal
+  visible={showReactivateModal}
+  transparent
+  animationType="fade"
+  onRequestClose={closeReactivateModal}
+>
+  <View style={styles.overlay}>
+    <ScrollView contentContainerStyle={{ flexGrow: 1, justifyContent: "center", padding: 20 }}>
+      <View style={[styles.modalCard, { maxHeight: '90%', maxWidth: 400 }]}>
+        <View style={styles.modalHeader}>
+          <Text style={styles.modalTitle}>
+            Reactivate & Reschedule {reactivatingAppointment?.serviceCode}
+          </Text>
+          <TouchableOpacity onPress={closeReactivateModal}>
+            <Text style={{ fontWeight: "800", color: COLORS.dim, fontSize: 20 }}>✕</Text>
+          </TouchableOpacity>
+        </View>
+
+        {reactivatingAppointment && (
+          <ScrollView nestedScrollEnabled showsVerticalScrollIndicator={false}>
+            {/* Info text */}
+            <View style={{ 
+              backgroundColor: "#DBEAFE", 
+              padding: 12, 
+              borderRadius: 8, 
+              marginBottom: 16 
+            }}>
+              <Text style={{ color: "#1E40AF", fontSize: 13, fontWeight: "600" }}>
+                Select a new date and time to reactivate this appointment
+              </Text>
+            </View>
+
+            {/* Month navigation */}
+            <View style={styles.monthNav}>
+              <TouchableOpacity
+                onPress={() => setReactivateCalendarMonth(
+                  new Date(reactivateCalendarMonth.getFullYear(), reactivateCalendarMonth.getMonth() - 1, 1)
+                )}
+                style={styles.navBtn}
+              >
+                <Text style={styles.navBtnText}>◀</Text>
+              </TouchableOpacity>
+              <Text style={styles.monthText}>
+                {monthTitle(reactivateCalendarMonth)}
+              </Text>
+              <TouchableOpacity
+                onPress={() => setReactivateCalendarMonth(
+                  new Date(reactivateCalendarMonth.getFullYear(), reactivateCalendarMonth.getMonth() + 1, 1)
+                )}
+                style={styles.navBtn}
+              >
+                <Text style={styles.navBtnText}>▶</Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* Week header */}
+            <View style={styles.calGrid}>
+              {["S", "M", "T", "W", "T", "F", "S"].map((d, i) => (
+                <Text key={i} style={styles.calHeader}>{d}</Text>
+              ))}
+            </View>
+
+            {/* Calendar grid */}
+            <View style={styles.calGrid}>
+              {getCalendarDays(reactivateCalendarMonth).map((d, idx) => {
+                if (d.getTime() === 0) return <View key={idx} style={styles.calCell} />;
+                
+                const today = new Date();
+                today.setHours(0, 0, 0, 0);
+                d.setHours(0, 0, 0, 0);
+                
+                const isAvailable = isDateAvailable(d, reactivatingAppointment.serviceCode) && d >= today;
+                const isSelected = reactivateDate && sameDay(d, reactivateDate);
+                
+                return (
+                  <TouchableOpacity
+                    key={idx}
+                    onPress={() => isAvailable && setReactivateDate(d)}
+                    disabled={!isAvailable}
+                    style={[
+                      styles.calCell,
+                      !isAvailable && { opacity: 0.3 },
+                      isSelected && styles.calCellSelected
+                    ]}
+                  >
+                    <Text style={[styles.calDay, isSelected && { color: "white", fontWeight: "800" }]}>
+                      {d.getDate()}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+
+            {/* Available slots */}
+            {reactivateDate && (
+              <View style={{ marginTop: 16 }}>
+                <Text style={styles.inputLabel}>Available Time Slots</Text>
+                {reactivateAvailableSlots.length > 0 ? (
+                  <ScrollView style={styles.timeScroll} nestedScrollEnabled>
+                    {reactivateAvailableSlots.map((slot, i) => (
+                      <TouchableOpacity
+                        key={i}
+                        onPress={() => setReactivateSlot(slot)}
+                        style={[
+                          styles.timeOption,
+                          reactivateSlot?.startTime === slot.startTime && 
+                          reactivateSlot?.endTime === slot.endTime && 
+                          styles.timeOptionActive
+                        ]}
+                      >
+                        <Text style={[
+                          styles.timeOptionText,
+                          reactivateSlot?.startTime === slot.startTime && 
+                          reactivateSlot?.endTime === slot.endTime && 
+                          styles.timeOptionTextActive
+                        ]}>
+                          {slot.startTime} - {slot.endTime}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </ScrollView>
+                ) : (
+                  <Text style={{ color: COLORS.dim, marginTop: 8 }}>No available slots</Text>
+                )}
+              </View>
+            )}
+
+            <View style={{ flexDirection: "row", marginTop: 16, gap: 10 }}>
+              <TouchableOpacity
+                onPress={closeReactivateModal}
+                disabled={isReactivating}
+                style={[styles.modalBtnSecondary, { flex: 1 }]}
+              >
+                <Text style={styles.modalBtnSecondaryText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={handleReactivateAppointment}
+                disabled={isReactivating || !reactivateDate || !reactivateSlot}
+                style={[
+                  styles.modalBtn,
+                  { flex: 1, backgroundColor: "#16a34a" },
+                  (isReactivating || !reactivateDate || !reactivateSlot) && { opacity: 0.6 },
+                ]}
+              >
+                {isReactivating ? (
+                  <ActivityIndicator color="white" size="small" />
+                ) : (
+                  <Text style={styles.modalBtnText}>Reactivate</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </ScrollView>
+        )}
+      </View>
+    </ScrollView>
+  </View>
+</Modal>
+
+
+{/* Edit Modal - CONTINUES FROM PART 1 */}
+<Modal visible={editOpen} transparent animationType="fade" onRequestClose={closeEdit}>
   <View style={styles.overlay}>
     <ScrollView contentContainerStyle={{ flexGrow: 1, justifyContent: "center", padding: 20 }}>
       <View style={[styles.modalCard, { maxHeight: '90%' }]}>
@@ -951,7 +1520,11 @@ const filterTimeOptionsByAvailableRanges = useCallback((ranges: string[], servic
               {getCalendarDays(editCalendarDate).map((d, idx) => {
                 if (d.getTime() === 0) return <View key={idx} style={styles.calCell} />;
                 
-                const isAvailable = isDateAvailable(d, selectedEdit.serviceCode);
+                const today = new Date();
+                today.setHours(0, 0, 0, 0);
+                d.setHours(0, 0, 0, 0);
+                
+                const isAvailable = isDateAvailable(d, selectedEdit.serviceCode) && d >= today;
                 const isSelected = editDate && sameDay(d, editDate);
                 
                 return (
@@ -1018,77 +1591,77 @@ const filterTimeOptionsByAvailableRanges = useCallback((ranges: string[], servic
                   </Text>
                 </TouchableOpacity>
 
-               {showEditCustomTime && (
-  <View style={styles.customTimeContainer}>
-    <Text style={styles.customTimeTitle}>Custom Time Slot</Text>
+                {showEditCustomTime && (
+                  <View style={styles.customTimeContainer}>
+                    <Text style={styles.customTimeTitle}>Custom Time Slot</Text>
 
-    <View style={styles.availableTimeContainer}>
-      <Text style={styles.availableTimeLabel}>Available Time Today:</Text>
-      {findAvailableTimeRanges(editDate).map((range, idx) => (
-        <Text key={idx} style={styles.availableTimeText}>{range}</Text>
-      ))}
-    </View>
+                    <View style={styles.availableTimeContainer}>
+                      <Text style={styles.availableTimeLabel}>Available Time Today:</Text>
+                      {findAvailableTimeRanges(editDate).map((range, idx) => (
+                        <Text key={idx} style={styles.availableTimeText}>{range}</Text>
+                      ))}
+                    </View>
 
-    <View style={{ marginBottom: 12 }}>
-      <Text style={styles.inputLabel}>Start Time</Text>
-      <View style={styles.pickerContainer}>
-        <ScrollView style={styles.timePicker} nestedScrollEnabled>
-          {filterTimeOptionsByAvailableRanges(
-            findAvailableTimeRanges(editDate),
-            selectedEdit.serviceCode
-          ).length === 0 ? (
-            <View style={{ padding: 12 }}>
-              <Text style={{ color: COLORS.dim, textAlign: "center" }}>
-                No available time slots
-              </Text>
-            </View>
-          ) : (
-            filterTimeOptionsByAvailableRanges(
-              findAvailableTimeRanges(editDate),
-              selectedEdit.serviceCode
-            ).map(time => (
-              <TouchableOpacity
-                key={time}
-                onPress={() => {
-                  setEditCustomStart(time);
-                  const duration = getServiceDuration(selectedEdit.serviceCode);
-                  const end = calculateEndTime(time, duration);
-                  setEditCustomEnd(end);
-                }}
-                style={[
-                  styles.timeOption,
-                  editCustomStart === time && styles.timeOptionActive
-                ]}
-              >
-                <Text style={[
-                  styles.timeOptionText,
-                  editCustomStart === time && styles.timeOptionTextActive
-                ]}>
-                  {time}
-                </Text>
-              </TouchableOpacity>
-            ))
-          )}
-        </ScrollView>
-      </View>
-    </View>
+                    <View style={{ marginBottom: 12 }}>
+                      <Text style={styles.inputLabel}>Start Time</Text>
+                      <View style={styles.pickerContainer}>
+                        <ScrollView style={styles.timePicker} nestedScrollEnabled>
+                          {filterTimeOptionsByAvailableRanges(
+                            findAvailableTimeRanges(editDate),
+                            selectedEdit.serviceCode
+                          ).length === 0 ? (
+                            <View style={{ padding: 12 }}>
+                              <Text style={{ color: COLORS.dim, textAlign: "center" }}>
+                                No available time slots
+                              </Text>
+                            </View>
+                          ) : (
+                            filterTimeOptionsByAvailableRanges(
+                              findAvailableTimeRanges(editDate),
+                              selectedEdit.serviceCode
+                            ).map(time => (
+                              <TouchableOpacity
+                                key={time}
+                                onPress={() => {
+                                  setEditCustomStart(time);
+                                  const duration = getServiceDuration(selectedEdit.serviceCode);
+                                  const end = calculateEndTime(time, duration);
+                                  setEditCustomEnd(end);
+                                }}
+                                style={[
+                                  styles.timeOption,
+                                  editCustomStart === time && styles.timeOptionActive
+                                ]}
+                              >
+                                <Text style={[
+                                  styles.timeOptionText,
+                                  editCustomStart === time && styles.timeOptionTextActive
+                                ]}>
+                                  {time}
+                                </Text>
+                              </TouchableOpacity>
+                            ))
+                          )}
+                        </ScrollView>
+                      </View>
+                    </View>
 
-    <View style={{ marginBottom: 12 }}>
-      <Text style={styles.inputLabel}>End Time (Auto-calculated)</Text>
-      <View style={styles.disabledInput}>
-        <Text style={{ color: COLORS.dim }}>
-          {editCustomEnd || "Will be calculated automatically"}
-        </Text>
-      </View>
-    </View>
+                    <View style={{ marginBottom: 12 }}>
+                      <Text style={styles.inputLabel}>End Time (Auto-calculated)</Text>
+                      <View style={styles.disabledInput}>
+                        <Text style={{ color: COLORS.dim }}>
+                          {editCustomEnd || "Will be calculated automatically"}
+                        </Text>
+                      </View>
+                    </View>
 
-    {editCustomStart && editCustomEnd && (
-      <Text style={{ fontSize: 12, color: COLORS.dim, marginTop: 8 }}>
-        Duration: {getServiceDuration(selectedEdit.serviceCode)} minutes
-      </Text>
-    )}
-  </View>
-)}
+                    {editCustomStart && editCustomEnd && (
+                      <Text style={{ fontSize: 12, color: COLORS.dim, marginTop: 8 }}>
+                        Duration: {getServiceDuration(selectedEdit.serviceCode)} minutes
+                      </Text>
+                    )}
+                  </View>
+                )}
               </View>
             )}
 
@@ -1172,7 +1745,11 @@ const filterTimeOptionsByAvailableRanges = useCallback((ranges: string[], servic
                 {getCalendarDays(createCalendarDate).map((d, idx) => {
                   if (d.getTime() === 0) return <View key={idx} style={styles.calCell} />;
                   
-                  const isAvailable = isDateAvailable(d, createServiceCode);
+                  const today = new Date();
+                  today.setHours(0, 0, 0, 0);
+                  d.setHours(0, 0, 0, 0);
+                  
+                  const isAvailable = isDateAvailable(d, createServiceCode) && d >= today;
                   const isSelected = createDate && sameDay(d, createDate);
                   
                   return (
@@ -1240,76 +1817,76 @@ const filterTimeOptionsByAvailableRanges = useCallback((ranges: string[], servic
                   </TouchableOpacity>
 
                   {showCreateCustomTime && (
-  <View style={styles.customTimeContainer}>
-    <Text style={styles.customTimeTitle}>Custom Time Slot</Text>
+                    <View style={styles.customTimeContainer}>
+                      <Text style={styles.customTimeTitle}>Custom Time Slot</Text>
 
-    <View style={styles.availableTimeContainer}>
-      <Text style={styles.availableTimeLabel}>Available Time Today:</Text>
-      {findAvailableTimeRanges(createDate).map((range, idx) => (
-        <Text key={idx} style={styles.availableTimeText}>{range}</Text>
-      ))}
-    </View>
+                      <View style={styles.availableTimeContainer}>
+                        <Text style={styles.availableTimeLabel}>Available Time Today:</Text>
+                        {findAvailableTimeRanges(createDate).map((range, idx) => (
+                          <Text key={idx} style={styles.availableTimeText}>{range}</Text>
+                        ))}
+                      </View>
 
-    <View style={{ marginBottom: 12 }}>
-      <Text style={styles.inputLabel}>Start Time</Text>
-      <View style={styles.pickerContainer}>
-        <ScrollView style={styles.timePicker} nestedScrollEnabled>
-          {filterTimeOptionsByAvailableRanges(
-            findAvailableTimeRanges(createDate),
-            createServiceCode
-          ).length === 0 ? (
-            <View style={{ padding: 12 }}>
-              <Text style={{ color: COLORS.dim, textAlign: "center" }}>
-                No available time slots
-              </Text>
-            </View>
-          ) : (
-            filterTimeOptionsByAvailableRanges(
-              findAvailableTimeRanges(createDate),
-              createServiceCode
-            ).map(time => (
-              <TouchableOpacity
-                key={time}
-                onPress={() => {
-                  setCreateCustomStart(time);
-                  const duration = getServiceDuration(createServiceCode);
-                  const end = calculateEndTime(time, duration);
-                  setCreateCustomEnd(end);
-                }}
-                style={[
-                  styles.timeOption,
-                  createCustomStart === time && styles.timeOptionActive
-                ]}
-              >
-                <Text style={[
-                  styles.timeOptionText,
-                  createCustomStart === time && styles.timeOptionTextActive
-                ]}>
-                  {time}
-                </Text>
-              </TouchableOpacity>
-            ))
-          )}
-        </ScrollView>
-      </View>
-    </View>
+                      <View style={{ marginBottom: 12 }}>
+                        <Text style={styles.inputLabel}>Start Time</Text>
+                        <View style={styles.pickerContainer}>
+                          <ScrollView style={styles.timePicker} nestedScrollEnabled>
+                            {filterTimeOptionsByAvailableRanges(
+                              findAvailableTimeRanges(createDate),
+                              createServiceCode
+                            ).length === 0 ? (
+                              <View style={{ padding: 12 }}>
+                                <Text style={{ color: COLORS.dim, textAlign: "center" }}>
+                                  No available time slots
+                                </Text>
+                              </View>
+                            ) : (
+                              filterTimeOptionsByAvailableRanges(
+                                findAvailableTimeRanges(createDate),
+                                createServiceCode
+                              ).map(time => (
+                                <TouchableOpacity
+                                  key={time}
+                                  onPress={() => {
+                                    setCreateCustomStart(time);
+                                    const duration = getServiceDuration(createServiceCode);
+                                    const end = calculateEndTime(time, duration);
+                                    setCreateCustomEnd(end);
+                                  }}
+                                  style={[
+                                    styles.timeOption,
+                                    createCustomStart === time && styles.timeOptionActive
+                                  ]}
+                                >
+                                  <Text style={[
+                                    styles.timeOptionText,
+                                    createCustomStart === time && styles.timeOptionTextActive
+                                  ]}>
+                                    {time}
+                                  </Text>
+                                </TouchableOpacity>
+                              ))
+                            )}
+                          </ScrollView>
+                        </View>
+                      </View>
 
-    <View style={{ marginBottom: 12 }}>
-      <Text style={styles.inputLabel}>End Time (Auto-calculated)</Text>
-      <View style={styles.disabledInput}>
-        <Text style={{ color: COLORS.dim }}>
-          {createCustomEnd || "Will be calculated automatically"}
-        </Text>
-      </View>
-    </View>
+                      <View style={{ marginBottom: 12 }}>
+                        <Text style={styles.inputLabel}>End Time (Auto-calculated)</Text>
+                        <View style={styles.disabledInput}>
+                          <Text style={{ color: COLORS.dim }}>
+                            {createCustomEnd || "Will be calculated automatically"}
+                          </Text>
+                        </View>
+                      </View>
 
-    {createCustomStart && createCustomEnd && (
-      <Text style={{ fontSize: 12, color: COLORS.dim, marginTop: 8 }}>
-        Duration: {getServiceDuration(createServiceCode)} minutes
-      </Text>
-    )}
-  </View>
-)}
+                      {createCustomStart && createCustomEnd && (
+                        <Text style={{ fontSize: 12, color: COLORS.dim, marginTop: 8 }}>
+                          Duration: {getServiceDuration(createServiceCode)} minutes
+                        </Text>
+                      )}
+                    </View>
+                  )}
                 </View>
               )}
 
@@ -1345,25 +1922,6 @@ function DetailRow({ label, value }: { label: string; value: string }) {
     </View>
   );
 }
-
-const getServiceDuration = (code: string): number => {
-  const durations: Record<string, number> = {
-    B1: 60, B2: 50, C1: 60, C2: 25, D1: 60, D2: 25, E1: 140, F1: 75,
-  };
-  return durations[code] || 60;
-};
-
-
-
-const calculateEndTime = (startTime: string, durationMinutes: number): string => {
-  const [hours, minutes] = startTime.split(':').map(Number);
-  const totalMinutes = hours * 60 + minutes + durationMinutes;
-  const endHours = Math.floor(totalMinutes / 60) % 24;
-  const endMinutes = totalMinutes % 60;
-  return `${endHours.toString().padStart(2, '0')}:${endMinutes.toString().padStart(2, '0')}`;
-};
-
-
 
 // Styles
 const styles = StyleSheet.create({
@@ -1444,50 +2002,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     paddingVertical: 6,
   },
-  
-customTimeContainer: {
-  marginTop: 12,
-  padding: 12,
-  backgroundColor: "#F9FBFA",
-  borderRadius: 10,
-  borderWidth: 1,
-  borderColor: COLORS.line,
-},
-customTimeTitle: {
-  fontSize: 14,
-  fontWeight: "700",
-  color: COLORS.text,
-  marginBottom: 12,
-},
-availableTimeContainer: {
-  padding: 12,
-  backgroundColor: COLORS.card,
-  borderRadius: 8,
-  marginBottom: 12,
-},
-availableTimeLabel: {
-  fontSize: 12,
-  fontWeight: "700",
-  color: COLORS.dim,
-  marginBottom: 8,
-},
-availableTimeText: {
-  fontSize: 12,
-  color: "#16a34a",
-  marginBottom: 4,
-},
-pickerContainer: {
-  backgroundColor: COLORS.card,
-  borderRadius: 8,
-  borderWidth: 1,
-  borderColor: COLORS.line,
-  maxHeight: 150,
-},
-timePicker: {
-  maxHeight: 150,
-},
-timeOptionActive: { backgroundColor: COLORS.accent },
-timeOptionTextActive: { color: "white", fontWeight: "700" },
   calCell: {
     width: "13%",
     aspectRatio: 1,
@@ -1566,9 +2080,9 @@ timeOptionTextActive: { color: "white", fontWeight: "700" },
     borderBottomWidth: 1,
     borderBottomColor: COLORS.line,
   },
- 
+  timeOptionActive: { backgroundColor: COLORS.accent },
   timeOptionText: { fontSize: 14, color: COLORS.text },
-  
+  timeOptionTextActive: { color: "white", fontWeight: "700" },
   serviceBtn: {
     paddingHorizontal: 12,
     paddingVertical: 8,
@@ -1596,9 +2110,122 @@ timeOptionTextActive: { color: "white", fontWeight: "700" },
     fontWeight: "700",
     textAlign: "center",
   },
+  customTimeContainer: {
+    marginTop: 12,
+    padding: 12,
+    backgroundColor: "#F9FBFA",
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: COLORS.line,
+  },
+  customTimeTitle: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: COLORS.text,
+    marginBottom: 12,
+  },
+  availableTimeContainer: {
+    padding: 12,
+    backgroundColor: COLORS.card,
+    borderRadius: 8,
+    marginBottom: 12,
+  },
+  availableTimeLabel: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: COLORS.dim,
+    marginBottom: 8,
+  },
+  availableTimeText: {
+    fontSize: 12,
+    color: "#16a34a",
+    marginBottom: 4,
+  },
+  pickerContainer: {
+    backgroundColor: COLORS.card,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: COLORS.line,
+    maxHeight: 150,
+  },
+  timePicker: {
+    maxHeight: 150,
+  },
   disabledInput: {
     backgroundColor: COLORS.bg,
     borderRadius: 8,
     padding: 12,
+  },
+  filterBtn: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    backgroundColor: COLORS.bg,
+    borderWidth: 1,
+    borderColor: COLORS.line,
+  },
+  filterBtnActive: {
+    backgroundColor: COLORS.accent,
+    borderColor: COLORS.accent,
+  },
+  filterBtnText: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: COLORS.dim,
+  },
+  filterBtnTextActive: {
+    color: "white",
+  },
+  statusBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 12,
+  },
+  statusBadgeText: {
+    fontSize: 10,
+    fontWeight: "800",
+    letterSpacing: 0.5,
+  },
+  cancelBtn: {
+    backgroundColor: "#DC2626",
+    paddingVertical: 12,
+    borderRadius: 8,
+    alignItems: "center",
+  },
+  cancelBtnText: {
+    color: "white",
+    fontWeight: "700",
+  },
+  cancelAppointmentInfo: {
+    backgroundColor: COLORS.bg,
+    borderRadius: 12,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: COLORS.line,
+  },
+  cancelAppointmentTitle: {
+    fontSize: 18,
+    fontWeight: "800",
+    color: COLORS.text,
+    marginBottom: 12,
+  },
+  cancelAppointmentDetails: {
+    fontSize: 14,
+    color: COLORS.dim,
+    marginBottom: 6,
+  },
+  warningBox: {
+    backgroundColor: "#FEF3C7",
+    borderRadius: 8,
+    padding: 12,
+    marginTop: 16,
+    borderWidth: 1,
+    borderColor: "#F59E0B",
+  },
+  warningText: {
+    fontSize: 13,
+    color: "#92400E",
+    fontWeight: "600",
+    textAlign: "center",
   },
 });
