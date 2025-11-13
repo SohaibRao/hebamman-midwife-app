@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
   FlatList,
   Modal,
   ScrollView,
@@ -29,6 +30,18 @@ const COLORS = {
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
 
+// Service names for better display
+const SERVICE_NAMES: Record<string, string> = {
+  "A1/A2": "Initial Consultation",
+  B1: "Pre Birth Visit",
+  B2: "Pre Birth Video",
+  E1: "Birth Training",
+  C1: "Early Care Visit",
+  C2: "Early Care Video",
+  D1: "Late Care Visit",
+  D2: "Late Care Video",
+  F1: "After Birth Gym",
+};
 
 // -------------------- Types --------------------
 type MonthKey = string; // "M/YYYY"
@@ -118,6 +131,28 @@ const SERVICE_COLORS: Record<string, string> = {
 };
 const codeColor = (code: string) => SERVICE_COLORS[code] ?? COLORS.sage;
 
+// Get status badge style - moved outside component for global access
+const getStatusBadgeStyle = (status?: string) => {
+  const normalizedStatus = status?.toLowerCase() || "active";
+  
+  const styles: Record<string, any> = {
+    active: {
+      backgroundColor: "#D1FAE5",
+      color: "#065F46",
+    },
+    pending: {
+      backgroundColor: "#FEF3C7",
+      color: "#92400E",
+    },
+    cancelled: {
+      backgroundColor: "#FEE2E2",
+      color: "#991B1B",
+    },
+  };
+  
+  return styles[normalizedStatus] || styles.active;
+};
+
 // safe JSON
 async function readJsonSafe<T = any>(res: Response): Promise<T> {
   const text = await res.text();
@@ -153,15 +188,12 @@ async function fetchMonthlyOnce(
 // Fetch user details by IDs
 async function fetchUserDetails(ids: string[]): Promise<Record<string, UserDetail>> {
   try {
-    console.log("Calling user details API with ids:", ids);
     const res = await api("/api/public/user/names", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ ids }),
     });
-    console.log("User details API response status:", res.status);
     const json = await readJsonSafe<{ success: boolean; data: Record<string, UserDetail> }>(res);
-    console.log("User details API response:", json);
     if (json?.success && json.data) {
       return json.data;
     }
@@ -279,41 +311,45 @@ export default function AppointmentsScreen() {
   const [customEndTime, setCustomEndTime] = useState<string>("");
   const [availableTimeRanges, setAvailableTimeRanges] = useState<string[]>([]);
 
-  // Delete/Cancel states
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  const [deletingAppointment, setDeletingAppointment] = useState<UiApt | null>(null);
-  const [isDeleting, setIsDeleting] = useState(false);
+  // Cancel appointment states
+  const [showCancelConfirm, setShowCancelConfirm] = useState(false);
+  const [cancelingAppointment, setCancelingAppointment] = useState<UiApt | null>(null);
+  const [isCanceling, setIsCanceling] = useState(false);
+
+  // Reactivate appointment states
+  const [showReactivateModal, setShowReactivateModal] = useState(false);
+  const [reactivatingAppointment, setReactivatingAppointment] = useState<UiApt | null>(null);
+  const [reactivateDate, setReactivateDate] = useState<Date | null>(null);
+  const [reactivateSlot, setReactivateSlot] = useState<{ startTime: string; endTime: string } | null>(null);
+  const [isReactivating, setIsReactivating] = useState(false);
+  const [reactivateCalendarMonth, setReactivateCalendarMonth] = useState<Date>(new Date());
 
   const [metaInfo, setMetaInfo] = useState<{ monthsFound?: number; totalDocs?: number } | null>(null);
 
+  // Status filter
+  const [statusFilter, setStatusFilter] = useState<string>("all");
+
   const fetchMonthly = useCallback(async () => {
     if (!midwifeId) {
-      console.log("No midwifeId, skipping fetch");
       return;
     }
     
-    console.log("Starting fetchMonthly with midwifeId:", midwifeId);
     setLoading(true);
     setError(null);
     
     try {
       const payload = { midwifeId, clientET: clientET.toISOString() };
-      console.log("Fetching with payload:", payload);
       
       let ok =
         (await fetchMonthlyOnce(`/api/public/PostBirthAppointments/monthly-view`, payload)) ||
         (await fetchMonthlyOnce(`/app/api/public/PostBirthAppointments/monthly-view`, payload));
       
-      console.log("Fetch result:", ok);
-      
       if (!ok) {
-        console.log("No data returned from API");
         throw new Error("No appointments returned from server");
       }
 
       setMonthly(ok.data || {});
       setMetaInfo({ monthsFound: ok.meta?.monthsFound, totalDocs: ok.meta?.totalDocuments });
-      console.log("Set monthly data, months:", ok.meta?.monthsFound);
 
       // Extract all unique clientIds
       const clientIds = new Set<string>();
@@ -333,37 +369,29 @@ export default function AppointmentsScreen() {
         extractIds(bucket.D2);
         extractIds(bucket.F1);
       });
-
-      console.log("Fetching user details for clientIds:", Array.from(clientIds));
       
       // Fetch user details for all clientIds
       if (clientIds.size > 0) {
         const details = await fetchUserDetails(Array.from(clientIds));
-        console.log("User details fetched:", details);
         setUserDetails(details);
       }
       
-      console.log("fetchMonthly completed successfully");
     } catch (e: any) {
       console.error("Error in fetchMonthly:", e);
       setMonthly({});
       setError(e?.message ?? "Failed to load appointments");
     } finally {
-      console.log("Setting loading to false");
       setLoading(false);
     }
   }, [midwifeId]);
 
   useEffect(() => {
-    console.log("useEffect triggered - profileStatus:", profileStatus, "midwifeId:", midwifeId);
     if (profileStatus === "success" && midwifeId) {
-      console.log("Calling fetchMonthly");
       fetchMonthly();
     } else if (profileStatus === "error") {
-      console.log("Profile status is error");
       setLoading(false);
     }
-  }, [profileStatus, midwifeId]);
+  }, [profileStatus, midwifeId, fetchMonthly]);
 
   // flatten to ALL, then filter by current list month
   const allAppointments: UiApt[] = useMemo(() => {
@@ -390,10 +418,44 @@ export default function AppointmentsScreen() {
   }, [monthly]);
 
   const listMonthKey = monthList[listMonthIndex]?.key;
+  
+  // Calculate status counts for current month
+  const statusCounts = useMemo(() => {
+    if (!listMonthKey) return { all: 0, active: 0, pending: 0, cancelled: 0 };
+    
+    const monthApts = allAppointments.filter((a) => monthKeyOf(a.dateObj) === listMonthKey);
+    
+    return {
+      all: monthApts.length,
+      active: monthApts.filter((a) => {
+        const status = a.status?.toLowerCase() || "active";
+        return status === "active";
+      }).length,
+      pending: monthApts.filter((a) => {
+        const status = a.status?.toLowerCase() || "active";
+        return status === "pending";
+      }).length,
+      cancelled: monthApts.filter((a) => {
+        const status = a.status?.toLowerCase() || "active";
+        return status === "cancelled";
+      }).length,
+    };
+  }, [allAppointments, listMonthKey]);
+  
   const monthAppointments = useMemo(() => {
     if (!listMonthKey) return [];
-    return allAppointments.filter((a) => monthKeyOf(a.dateObj) === listMonthKey);
-  }, [allAppointments, listMonthKey]);
+    let filtered = allAppointments.filter((a) => monthKeyOf(a.dateObj) === listMonthKey);
+    
+    // Apply status filter
+    if (statusFilter !== "all") {
+      filtered = filtered.filter((a) => {
+        const aptStatus = a.status?.toLowerCase() || "active";
+        return aptStatus === statusFilter;
+      });
+    }
+    
+    return filtered;
+  }, [allAppointments, listMonthKey, statusFilter]);
 
   // ---------------- CALENDAR (all months) ----------------
   const minDate = useMemo(
@@ -485,10 +547,36 @@ export default function AppointmentsScreen() {
     });
   }, [selectedEdit, editDate, weekdaySlots, occupiedSlotSet]);
 
+  // Available slots for reactivate date
+  const availableSlotsForReactivateDate = useMemo(() => {
+    if (!reactivatingAppointment || !reactivateDate) return [];
+    const raw = weekdaySlots(reactivateDate, reactivatingAppointment.serviceCode);
+    const occ = occupiedSlotSet(reactivateDate);
+    return raw.filter((s) => {
+      const key = `${s.startTime}-${s.endTime}`;
+      return !occ.has(key);
+    });
+  }, [reactivatingAppointment, reactivateDate, weekdaySlots, occupiedSlotSet]);
+
+  // Generate candidate dates for reactivate
+  const reactivateCandidateDays = useMemo(() => {
+    if (!reactivatingAppointment) return [];
+    const currentYear = new Date().getFullYear();
+    return generateTimetableDates(currentYear, timetable, reactivatingAppointment.serviceCode);
+  }, [reactivatingAppointment, timetable]);
+
+  // Create a set of valid dates for reactivate
+  const reactivateValidDatesSet = useMemo(() => {
+    const set = new Set<string>();
+    reactivateCandidateDays.forEach(d => set.add(toDMY(d)));
+    return set;
+  }, [reactivateCandidateDays]);
+
   const openDetails = useCallback((apt: UiApt) => {
     setSelectedDetails(apt);
     setDetailsOpen(true);
   }, []);
+  
   const closeDetails = useCallback(() => {
     setDetailsOpen(false);
     setSelectedDetails(null);
@@ -506,6 +594,7 @@ export default function AppointmentsScreen() {
     setAvailableTimeRanges([]);
     setEditOpen(true);
   }, []);
+  
   const closeEdit = useCallback(() => {
     setEditOpen(false);
     setSelectedEdit(null);
@@ -523,7 +612,7 @@ export default function AppointmentsScreen() {
     // Validate time slot selection
     if (showCustomTimeOption) {
       if (!customStartTime || !customEndTime) {
-        alert("Please select start time for custom slot");
+        Alert.alert("Error", "Please select start time for custom slot");
         return;
       }
       if (!isCustomTimeValid(customStartTime, customEndTime, editDate)) {
@@ -531,7 +620,7 @@ export default function AppointmentsScreen() {
       }
     } else {
       if (!editSlot) {
-        alert("Please select a time slot");
+        Alert.alert("Error", "Please select a time slot");
         return;
       }
     }
@@ -567,11 +656,161 @@ export default function AppointmentsScreen() {
       await fetchMonthly();
       setSubmitting(false);
       closeEdit();
+      Alert.alert("Success", "Appointment updated successfully");
     } catch (e: any) {
       setSubmitting(false);
-      setError(e?.message ?? "Failed to update appointment");
+      Alert.alert("Error", e?.message ?? "Failed to update appointment");
     }
   }, [selectedEdit, editDate, editSlot, showCustomTimeOption, customStartTime, customEndTime, midwifeId, fetchMonthly, closeEdit]);
+
+  // Cancel appointment handlers
+  const handleCancelAppointment = async () => {
+    if (!cancelingAppointment) return;
+
+    setIsCanceling(true);
+    
+    try {
+      const body: any = {
+        appointmentId: cancelingAppointment.appointmentId,
+        serviceCode: cancelingAppointment.serviceCode,
+      };
+
+      // Add midwifeId and clientId for non-A1/A2 services
+      if (cancelingAppointment.serviceCode !== "A1/A2") {
+        body.midwifeId = cancelingAppointment.midwifeId;
+        body.clientId = cancelingAppointment.clientId;
+      }
+
+      const response = await api("/api/public/cancelAppointment", {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(body),
+      });
+
+      const result = await response.json();
+
+      if (response.ok && result.success) {
+        Alert.alert(
+          "Success",
+          result.message || "Appointment cancelled successfully"
+        );
+        
+        // Close modals
+        setShowCancelConfirm(false);
+        setCancelingAppointment(null);
+        closeEdit();
+        closeDetails();
+        
+        // Refresh appointments
+        await fetchMonthly();
+      } else {
+        Alert.alert(
+          "Error",
+          result.error || result.details || "Failed to cancel appointment"
+        );
+      }
+    } catch (error: any) {
+      console.error("Cancel appointment error:", error);
+      Alert.alert("Error", "Something went wrong. Please try again.");
+    } finally {
+      setIsCanceling(false);
+    }
+  };
+
+  const openCancelConfirm = (apt: UiApt) => {
+    setCancelingAppointment(apt);
+    setShowCancelConfirm(true);
+  };
+
+  const closeCancelConfirm = () => {
+    if (!isCanceling) {
+      setShowCancelConfirm(false);
+      setCancelingAppointment(null);
+    }
+  };
+
+  // Reactivate appointment handlers
+  const openReactivateModal = (apt: UiApt) => {
+    setReactivatingAppointment(apt);
+    const aptDate = toDate(apt.appointmentDate);
+    setReactivateDate(aptDate);
+    setReactivateCalendarMonth(new Date(aptDate.getFullYear(), aptDate.getMonth(), 1));
+    setReactivateSlot({ startTime: apt.startTime, endTime: apt.endTime });
+    setShowReactivateModal(true);
+  };
+
+  const closeReactivateModal = () => {
+    if (!isReactivating) {
+      setShowReactivateModal(false);
+      setReactivatingAppointment(null);
+      setReactivateDate(null);
+      setReactivateSlot(null);
+    }
+  };
+
+  const handleReactivateAppointment = async () => {
+    if (!reactivatingAppointment || !reactivateDate || !reactivateSlot) {
+      Alert.alert("Error", "Please select a date and time slot");
+      return;
+    }
+
+    setIsReactivating(true);
+
+    try {
+      const body: any = {
+        appointmentId: reactivatingAppointment.appointmentId,
+        serviceCode: reactivatingAppointment.serviceCode,
+        updatedDate: toDMY(reactivateDate),
+        updatedStartTime: reactivateSlot.startTime,
+        updatedEndTime: reactivateSlot.endTime,
+      };
+
+      // Add midwifeId and clientId for non-A1/A2 services
+      if (reactivatingAppointment.serviceCode !== "A1/A2") {
+        body.midwifeId = reactivatingAppointment.midwifeId;
+        body.clientId = reactivatingAppointment.clientId;
+      }
+
+      const response = await api("/api/public/reactivateAppointment", {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(body),
+      });
+
+      const result = await response.json();
+
+      if (response.ok && result.success) {
+        Alert.alert(
+          "Success",
+          result.message || "Appointment reactivated successfully"
+        );
+
+        // Close modals
+        setShowReactivateModal(false);
+        setReactivatingAppointment(null);
+        setReactivateDate(null);
+        setReactivateSlot(null);
+        closeDetails();
+
+        // Refresh appointments
+        await fetchMonthly();
+      } else {
+        Alert.alert(
+          "Error",
+          result.error || result.details || "Failed to reactivate appointment"
+        );
+      }
+    } catch (error: any) {
+      console.error("Reactivate appointment error:", error);
+      Alert.alert("Error", "Something went wrong. Please try again.");
+    } finally {
+      setIsReactivating(false);
+    }
+  };
 
   // Get patient name
   const getPatientName = (clientId?: string) => {
@@ -697,53 +936,52 @@ export default function AppointmentsScreen() {
     return freeRanges.length > 0 ? freeRanges : ["No free time available"];
   }, [timetable, apptsByDay]);
 
-
   const filterTimeOptionsByAvailableRanges = useCallback((ranges: string[]): string[] => {
-  if (ranges[0] === "No free time available") return [];
-  
-  const allTimes = generateTimeOptions();
-  const availableTimes: string[] = [];
-  
-  ranges.forEach(range => {
-    const match = range.match(/(\d{2}):(\d{2}) - (\d{2}):(\d{2})/);
-    if (match) {
-      const rangeStart = `${match[1]}:${match[2]}`;
-      const rangeEnd = `${match[3]}:${match[4]}`;
-      
-      const startMinutes = parseTime(rangeStart);
-      const endMinutes = parseTime(rangeEnd);
-      
-      allTimes.forEach(time => {
-        const timeMinutes = parseTime(time);
-        // Include times that fall within the range and leave room for the appointment duration
-        if (selectedEdit) {
-          const duration = getServiceDuration(selectedEdit.serviceCode);
-          const endTimeMinutes = timeMinutes + duration;
-          
-          if (timeMinutes >= startMinutes && endTimeMinutes <= endMinutes) {
-            availableTimes.push(time);
+    if (ranges[0] === "No free time available") return [];
+    
+    const allTimes = generateTimeOptions();
+    const availableTimes: string[] = [];
+    
+    ranges.forEach(range => {
+      const match = range.match(/(\d{2}):(\d{2}) - (\d{2}):(\d{2})/);
+      if (match) {
+        const rangeStart = `${match[1]}:${match[2]}`;
+        const rangeEnd = `${match[3]}:${match[4]}`;
+        
+        const startMinutes = parseTime(rangeStart);
+        const endMinutes = parseTime(rangeEnd);
+        
+        allTimes.forEach(time => {
+          const timeMinutes = parseTime(time);
+          // Include times that fall within the range and leave room for the appointment duration
+          if (selectedEdit) {
+            const duration = getServiceDuration(selectedEdit.serviceCode);
+            const endTimeMinutes = timeMinutes + duration;
+            
+            if (timeMinutes >= startMinutes && endTimeMinutes <= endMinutes) {
+              availableTimes.push(time);
+            }
           }
-        }
-      });
-    }
-  });
-  
-  return availableTimes;
-}, [selectedEdit]);
+        });
+      }
+    });
+    
+    return availableTimes;
+  }, [selectedEdit]);
 
   const isCustomTimeValid = (startTime: string, endTime: string, date: Date): boolean => {
     const startMinutes = parseTime(startTime);
     const endMinutes = parseTime(endTime);
 
     if (endMinutes <= startMinutes) {
-      alert("End time must be after start time");
+      Alert.alert("Error", "End time must be after start time");
       return false;
     }
 
     const ranges = findAvailableTimeRanges(date);
 
     if (ranges[0] === "No free time available") {
-      alert("No free time available on this date");
+      Alert.alert("Error", "No free time available on this date");
       return false;
     }
 
@@ -759,53 +997,8 @@ export default function AppointmentsScreen() {
       }
     }
 
-    alert("Selected time is not within available time ranges");
+    Alert.alert("Error", "Selected time is not within available time ranges");
     return false;
-  };
-
-  // Delete/Cancel handlers
-  const handleCancelClick = (apt: UiApt) => {
-    setDeletingAppointment(apt);
-    setShowDeleteConfirm(true);
-  };
-
-  const handleConfirmCancel = async () => {
-    if (!deletingAppointment) return;
-    
-    setIsDeleting(true);
-    try {
-      // TODO: Add API call here when ready
-      // const response = await api(`/api/appointments/${deletingAppointment.appointmentId}`, {
-      //   method: 'DELETE'
-      // });
-      
-      console.log("Cancelling appointment:", deletingAppointment.appointmentId);
-      
-      // For now, just close the modals
-      await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate API call
-      
-      // TODO: After API is implemented, refresh data
-      // await fetchMonthly();
-      
-      setShowDeleteConfirm(false);
-      setDeletingAppointment(null);
-      closeDetails();
-      closeEdit();
-      
-      // Show success message
-      alert("Appointment cancelled successfully!");
-      
-    } catch (e: any) {
-      console.error("Error cancelling appointment:", e);
-      setError(e?.message ?? "Failed to cancel appointment");
-    } finally {
-      setIsDeleting(false);
-    }
-  };
-
-  const handleCancelDelete = () => {
-    setShowDeleteConfirm(false);
-    setDeletingAppointment(null);
   };
 
   // -------------------- Render --------------------
@@ -857,6 +1050,76 @@ export default function AppointmentsScreen() {
         </View>
       ) : tab === "list" ? (
         <>
+          {/* Status Filter */}
+          <View style={{ paddingHorizontal: 16, paddingVertical: 12, backgroundColor: COLORS.card }}>
+            <Text style={{ fontSize: 14, fontWeight: "700", color: COLORS.dim, marginBottom: 8 }}>
+              Filter by Status
+            </Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+              <View style={{ flexDirection: "row", gap: 8 }}>
+                <TouchableOpacity
+                  onPress={() => setStatusFilter("all")}
+                  style={[
+                    styles.filterBtn,
+                    statusFilter === "all" && styles.filterBtnActive,
+                  ]}
+                >
+                  <Text style={[
+                    styles.filterBtnText,
+                    statusFilter === "all" && styles.filterBtnTextActive,
+                  ]}>
+                    All ({statusCounts.all})
+                  </Text>
+                </TouchableOpacity>
+                
+                <TouchableOpacity
+                  onPress={() => setStatusFilter("active")}
+                  style={[
+                    styles.filterBtn,
+                    statusFilter === "active" && styles.filterBtnActive,
+                  ]}
+                >
+                  <Text style={[
+                    styles.filterBtnText,
+                    statusFilter === "active" && styles.filterBtnTextActive,
+                  ]}>
+                    Active ({statusCounts.active})
+                  </Text>
+                </TouchableOpacity>
+                
+                <TouchableOpacity
+                  onPress={() => setStatusFilter("pending")}
+                  style={[
+                    styles.filterBtn,
+                    statusFilter === "pending" && styles.filterBtnActive,
+                  ]}
+                >
+                  <Text style={[
+                    styles.filterBtnText,
+                    statusFilter === "pending" && styles.filterBtnTextActive,
+                  ]}>
+                    Pending ({statusCounts.pending})
+                  </Text>
+                </TouchableOpacity>
+                
+                <TouchableOpacity
+                  onPress={() => setStatusFilter("cancelled")}
+                  style={[
+                    styles.filterBtn,
+                    statusFilter === "cancelled" && styles.filterBtnActive,
+                  ]}
+                >
+                  <Text style={[
+                    styles.filterBtnText,
+                    statusFilter === "cancelled" && styles.filterBtnTextActive,
+                  ]}>
+                    Cancelled ({statusCounts.cancelled})
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </ScrollView>
+          </View>
+
           {/* Month nav for LIST */}
           <View style={{ paddingHorizontal: 16, marginBottom: 8, flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
             <TouchableOpacity
@@ -892,23 +1155,36 @@ export default function AppointmentsScreen() {
               <View style={styles.cardRow}>
                 <View style={[styles.dot, { backgroundColor: codeColor(item.serviceCode) }]} />
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.rowTitle}>
-                    {item.serviceCode} • {getPatientName(item.clientId)}
-                  </Text>
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 4 }}>
+                    <Text style={styles.rowTitle}>
+                      {item.serviceCode} • {getPatientName(item.clientId)}
+                    </Text>
+                    <View style={[
+                      styles.statusBadge,
+                      { backgroundColor: getStatusBadgeStyle(item.status).backgroundColor }
+                    ]}>
+                      <Text style={[
+                        styles.statusBadgeText,
+                        { color: getStatusBadgeStyle(item.status).color }
+                      ]}>
+                        {(item.status || "active").toUpperCase()}
+                      </Text>
+                    </View>
+                  </View>
                   <Text style={styles.rowSub}>
                     {fmtDateShort(item.dateObj)} • {item.startTime}–{item.endTime} • {item.duration}m
-                  </Text>
-                  <Text style={styles.statusText}>
-                    Status: <Text style={{ fontWeight: "800" }}>{item.status ?? "—"}</Text>
                   </Text>
                 </View>
                 <View style={{ gap: 8 }}>
                   <TouchableOpacity onPress={() => openDetails(item)} style={styles.ghostBtn}>
                     <Text style={styles.ghostText}>Details</Text>
                   </TouchableOpacity>
-                  <TouchableOpacity onPress={() => openEdit(item)} style={styles.editBtn}>
-                    <Text style={styles.editText}>Edit</Text>
-                  </TouchableOpacity>
+                  {/* Only show Edit button if appointment is not cancelled */}
+                  {item.status?.toLowerCase() !== "cancelled" && (
+                    <TouchableOpacity onPress={() => openEdit(item)} style={styles.editBtn}>
+                      <Text style={styles.editText}>Edit</Text>
+                    </TouchableOpacity>
+                  )}
                 </View>
               </View>
             )}
@@ -943,21 +1219,50 @@ export default function AppointmentsScreen() {
                 <Row label="Time" value={`${selectedDetails.startTime}–${selectedDetails.endTime}`} />
                 <Row label="Duration" value={`${selectedDetails.duration} min`} />
                 <Row label="Status" value={selectedDetails.status ?? "—"} />
-                <View style={{ flexDirection: "row", marginTop: 14, gap: 10 }}>
-                  <TouchableOpacity
-                    onPress={() => {
-                      const s = selectedDetails;
-                      closeDetails();
-                      if (s) openEdit(s);
-                    }}
-                    style={styles.cta}
-                  >
-                    <Text style={styles.ctaText}>Edit</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity onPress={closeDetails} style={styles.secondary}>
-                    <Text style={styles.secondaryText}>Close</Text>
-                  </TouchableOpacity>
-                </View>
+                
+                {selectedDetails.status?.toLowerCase() === "cancelled" ? (
+                  // Show Reactivate button for cancelled appointments
+                  <View style={{ flexDirection: "row", marginTop: 14, gap: 10 }}>
+                    <TouchableOpacity
+                      onPress={() => {
+                        closeDetails();
+                        if (selectedDetails) openReactivateModal(selectedDetails);
+                      }}
+                      style={[styles.cta, { flex: 1, backgroundColor: "#16a34a" }]}
+                    >
+                      <Text style={styles.ctaText}>Reactivate</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity 
+                      onPress={closeDetails} 
+                      style={[styles.secondary, { flex: 1 }]}
+                    >
+                      <Text style={styles.secondaryText}>Close</Text>
+                    </TouchableOpacity>
+                  </View>
+                ) : (
+                  // Show Edit and Cancel buttons for non-cancelled appointments
+                  <View style={{ flexDirection: "row", marginTop: 14, gap: 10 }}>
+                    <TouchableOpacity
+                      onPress={() => {
+                        const s = selectedDetails;
+                        closeDetails();
+                        if (s) openEdit(s);
+                      }}
+                      style={[styles.cta, { flex: 1 }]}
+                    >
+                      <Text style={styles.ctaText}>Edit</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity 
+                      onPress={() => {
+                        closeDetails();
+                        if (selectedDetails) openCancelConfirm(selectedDetails);
+                      }} 
+                      style={[styles.cancelBtn, { flex: 1 }]}
+                    >
+                      <Text style={styles.cancelBtnText}>Cancel</Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
               </>
             ) : null}
           </View>
@@ -1014,6 +1319,8 @@ export default function AppointmentsScreen() {
                     const startWeekday = firstDay.getDay();
                     const daysInMonth = new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() + 1, 0).getDate();
                     const cells = [];
+                    const today = new Date();
+                    today.setHours(0, 0, 0, 0); // Reset time for accurate comparison
 
                     // Empty cells before month starts
                     for (let i = 0; i < startWeekday; i++) {
@@ -1023,8 +1330,9 @@ export default function AppointmentsScreen() {
                     // Days of month
                     for (let day = 1; day <= daysInMonth; day++) {
                       const date = new Date(calendarMonth.getFullYear(), calendarMonth.getMonth(), day);
+                      date.setHours(0, 0, 0, 0);
                       const dateKey = toDMY(date);
-                      const isValid = validDatesSet.has(dateKey);
+                      const isValid = validDatesSet.has(dateKey) && date >= today; // Only future dates
                       const isSelected = editDate && sameDay(date, editDate);
 
                       cells.push(
@@ -1052,7 +1360,7 @@ export default function AppointmentsScreen() {
                   })()}
                 </View>
 
-                                  {/* Available slots section */}
+                {/* Available slots section */}
                 <View style={{ marginTop: 16, paddingBottom: 12 }}>
                   <Text style={[styles.sectionTitle, { fontSize: 16, marginBottom: 10 }]}>
                     {editDate ? `Slots on ${fmtDateShort(editDate)}` : "Select a date"}
@@ -1112,94 +1420,377 @@ export default function AppointmentsScreen() {
                       </TouchableOpacity>
 
                       {showCustomTimeOption && (
-  <View style={styles.customTimeContainer}>
-    <Text style={styles.customTimeTitle}>Custom Time Slot</Text>
+                        <View style={styles.customTimeContainer}>
+                          <Text style={styles.customTimeTitle}>Custom Time Slot</Text>
 
-    <View style={styles.availableTimeContainer}>
-      <Text style={styles.availableTimeLabel}>Available Time Today:</Text>
-      {availableTimeRanges.map((range, idx) => (
-        <Text key={idx} style={styles.availableTimeText}>{range}</Text>
-      ))}
-    </View>
+                          <View style={styles.availableTimeContainer}>
+                            <Text style={styles.availableTimeLabel}>Available Time Today:</Text>
+                            {availableTimeRanges.map((range, idx) => (
+                              <Text key={idx} style={styles.availableTimeText}>{range}</Text>
+                            ))}
+                          </View>
 
-    <View style={{ marginBottom: 12 }}>
-      <Text style={styles.inputLabel}>Start Time</Text>
-      <View style={styles.pickerContainer}>
-        <ScrollView style={styles.timePicker} nestedScrollEnabled>
-          {filterTimeOptionsByAvailableRanges(availableTimeRanges).length === 0 ? (
-            <View style={{ padding: 12 }}>
-              <Text style={{ color: COLORS.dim, textAlign: "center" }}>
-                No available time slots
-              </Text>
-            </View>
-          ) : (
-            filterTimeOptionsByAvailableRanges(availableTimeRanges).map(time => (
-              <TouchableOpacity
-                key={time}
-                onPress={() => {
-                  setCustomStartTime(time);
-                  if (selectedEdit) {
-                    const duration = getServiceDuration(selectedEdit.serviceCode);
-                    const end = calculateEndTime(time, duration);
-                    setCustomEndTime(end);
+                          <View style={{ marginBottom: 12 }}>
+                            <Text style={styles.inputLabel}>Start Time</Text>
+                            <View style={styles.pickerContainer}>
+                              <ScrollView style={styles.timePicker} nestedScrollEnabled>
+                                {filterTimeOptionsByAvailableRanges(availableTimeRanges).length === 0 ? (
+                                  <View style={{ padding: 12 }}>
+                                    <Text style={{ color: COLORS.dim, textAlign: "center" }}>
+                                      No available time slots
+                                    </Text>
+                                  </View>
+                                ) : (
+                                  filterTimeOptionsByAvailableRanges(availableTimeRanges).map(time => (
+                                    <TouchableOpacity
+                                      key={time}
+                                      onPress={() => {
+                                        setCustomStartTime(time);
+                                        if (selectedEdit) {
+                                          const duration = getServiceDuration(selectedEdit.serviceCode);
+                                          const end = calculateEndTime(time, duration);
+                                          setCustomEndTime(end);
+                                        }
+                                      }}
+                                      style={[
+                                        styles.timeOption,
+                                        customStartTime === time && styles.timeOptionSelected
+                                      ]}
+                                    >
+                                      <Text style={[
+                                        styles.timeOptionText,
+                                        customStartTime === time && styles.timeOptionTextSelected
+                                      ]}>
+                                        {time}
+                                      </Text>
+                                    </TouchableOpacity>
+                                  ))
+                                )}
+                              </ScrollView>
+                            </View>
+                          </View>
+
+                          <View style={{ marginBottom: 12 }}>
+                            <Text style={styles.inputLabel}>End Time (Auto-calculated)</Text>
+                            <View style={styles.disabledInput}>
+                              <Text style={{ color: COLORS.dim }}>
+                                {customEndTime || "Will be calculated automatically"}
+                              </Text>
+                            </View>
+                          </View>
+
+                          {customStartTime && customEndTime && selectedEdit && (
+                            <Text style={{ fontSize: 12, color: COLORS.dim, marginTop: 8 }}>
+                              Duration: {getServiceDuration(selectedEdit.serviceCode)} minutes
+                            </Text>
+                          )}
+                        </View>
+                      )}
+                    </View>
+                  )}
+                </View>
+
+                {/* Cancel Appointment Button */}
+                <TouchableOpacity
+                  onPress={() => {
+                    if (selectedEdit) {
+                      closeEdit();
+                      openCancelConfirm(selectedEdit);
+                    }
+                  }}
+                  style={styles.cancelBtn}
+                >
+                  <Text style={styles.cancelBtnText}>Cancel Appointment</Text>
+                </TouchableOpacity>
+
+                {/* Save Changes Button */}
+                <TouchableOpacity
+                  onPress={submitEdit}
+                  disabled={
+                    submitting ||
+                    (!showCustomTimeOption && !editSlot) ||
+                    (showCustomTimeOption && !customStartTime)
                   }
-                }}
-                style={[
-                  styles.timeOption,
-                  customStartTime === time && styles.timeOptionSelected
-                ]}
-              >
-                <Text style={[
-                  styles.timeOptionText,
-                  customStartTime === time && styles.timeOptionTextSelected
-                ]}>
-                  {time}
-                </Text>
+                  style={[
+                    styles.cta,
+                    { marginTop: 10 },
+                    (submitting || (!showCustomTimeOption && !editSlot) || (showCustomTimeOption && !customStartTime)) && { opacity: 0.6 }
+                  ]}
+                >
+                  <Text style={styles.ctaText}>{submitting ? "Saving…" : "Save Changes"}</Text>
+                </TouchableOpacity>
+              </ScrollView>
+            ) : null}
+          </View>
+        </View>
+      </Modal>
+
+      {/* Cancel Confirmation Modal */}
+      <Modal
+        visible={showCancelConfirm}
+        transparent
+        animationType="fade"
+        onRequestClose={closeCancelConfirm}
+      >
+        <View style={styles.overlay}>
+          <View style={[styles.modalCard, { maxWidth: 400 }]}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Cancel Appointment</Text>
+            </View>
+
+            {cancelingAppointment && (
+              <>
+                <View style={{ paddingVertical: 12 }}>
+                  <Text style={{ color: COLORS.text, marginBottom: 16, fontSize: 15 }}>
+                    Are you sure you want to cancel this appointment?
+                  </Text>
+
+                  <View style={styles.cancelAppointmentInfo}>
+                    <Text style={styles.cancelAppointmentTitle}>
+                      {SERVICE_NAMES[cancelingAppointment.serviceCode] || cancelingAppointment.serviceCode}
+                    </Text>
+                    <Text style={styles.cancelAppointmentDetails}>
+                      Patient: {getPatientName(cancelingAppointment.clientId)}
+                    </Text>
+                    <Text style={styles.cancelAppointmentDetails}>
+                      Date: {cancelingAppointment.appointmentDate}
+                    </Text>
+                    <Text style={styles.cancelAppointmentDetails}>
+                      Time: {cancelingAppointment.startTime} - {cancelingAppointment.endTime}
+                    </Text>
+                    <Text style={styles.cancelAppointmentDetails}>
+                      Duration: {cancelingAppointment.duration} minutes
+                    </Text>
+                  </View>
+
+                  <View style={styles.warningBox}>
+                    <Text style={styles.warningText}>
+                      ⚠️ This action cannot be undone
+                    </Text>
+                  </View>
+                </View>
+
+                <View style={{ flexDirection: "row", gap: 10, marginTop: 16 }}>
+                  <TouchableOpacity
+                    onPress={closeCancelConfirm}
+                    disabled={isCanceling}
+                    style={[styles.secondary, { flex: 1 }]}
+                  >
+                    <Text style={styles.secondaryText}>Go Back</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    onPress={handleCancelAppointment}
+                    disabled={isCanceling}
+                    style={[styles.cancelBtn, { flex: 1 }, isCanceling && { opacity: 0.6 }]}
+                  >
+                    {isCanceling ? (
+                      <ActivityIndicator color="white" size="small" />
+                    ) : (
+                      <Text style={styles.cancelBtnText}>
+                        Yes, Cancel It
+                      </Text>
+                    )}
+                  </TouchableOpacity>
+                </View>
+              </>
+            )}
+          </View>
+        </View>
+      </Modal>
+
+      {/* Reactivate Appointment Modal */}
+      <Modal
+        visible={showReactivateModal}
+        transparent
+        animationType="fade"
+        onRequestClose={closeReactivateModal}
+      >
+        <View style={styles.overlay}>
+          <View style={[styles.modalCard, { maxWidth: 400 }]}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>
+                Reactivate & Reschedule {reactivatingAppointment?.serviceCode}
+              </Text>
+              <TouchableOpacity onPress={closeReactivateModal}>
+                <Text style={{ fontWeight: "800", color: COLORS.dim, fontSize: 20 }}>✕</Text>
               </TouchableOpacity>
-            ))
-          )}
-        </ScrollView>
-      </View>
-    </View>
+            </View>
 
-    <View style={{ marginBottom: 12 }}>
-      <Text style={styles.inputLabel}>End Time (Auto-calculated)</Text>
-      <View style={styles.disabledInput}>
-        <Text style={{ color: COLORS.dim }}>
-          {customEndTime || "Will be calculated automatically"}
-        </Text>
-      </View>
-    </View>
+            {!timetable ? (
+              <Text style={{ color: "crimson" }}>No timetable found for this midwife.</Text>
+            ) : reactivatingAppointment ? (
+              <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 600 }}>
+                {/* Info text */}
+                <View style={{ 
+                  backgroundColor: "#DBEAFE", 
+                  padding: 12, 
+                  borderRadius: 8, 
+                  marginBottom: 16 
+                }}>
+                  <Text style={{ color: "#1E40AF", fontSize: 13, fontWeight: "600" }}>
+                    Select a new date and time to reactivate this appointment
+                  </Text>
+                </View>
 
-    {customStartTime && customEndTime && selectedEdit && (
-      <Text style={{ fontSize: 12, color: COLORS.dim, marginTop: 8 }}>
-        Duration: {getServiceDuration(selectedEdit.serviceCode)} minutes
-      </Text>
-    )}
-  </View>
-)}
+                {/* Month navigation */}
+                <View style={styles.editCalendarHeader}>
+                  <TouchableOpacity
+                    onPress={() => setReactivateCalendarMonth(
+                      new Date(reactivateCalendarMonth.getFullYear(), reactivateCalendarMonth.getMonth() - 1, 1)
+                    )}
+                    style={styles.monthNavBtn}
+                  >
+                    <Text style={styles.navBtnText}>◀</Text>
+                  </TouchableOpacity>
+                  <Text style={styles.monthTitle}>
+                    {reactivateCalendarMonth.toLocaleDateString(undefined, { month: "long", year: "numeric" })}
+                  </Text>
+                  <TouchableOpacity
+                    onPress={() => setReactivateCalendarMonth(
+                      new Date(reactivateCalendarMonth.getFullYear(), reactivateCalendarMonth.getMonth() + 1, 1)
+                    )}
+                    style={styles.monthNavBtn}
+                  >
+                    <Text style={styles.navBtnText}>▶</Text>
+                  </TouchableOpacity>
+                </View>
+
+                {/* Week header */}
+                <View style={styles.weekHeader}>
+                  {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((d) => (
+                    <Text key={d} style={styles.weekHdrText}>
+                      {d}
+                    </Text>
+                  ))}
+                </View>
+
+                {/* Calendar grid */}
+                <View style={styles.grid}>
+                  {(() => {
+                    const firstDay = new Date(
+                      reactivateCalendarMonth.getFullYear(),
+                      reactivateCalendarMonth.getMonth(),
+                      1
+                    );
+                    const startWeekday = firstDay.getDay();
+                    const daysInMonth = new Date(
+                      reactivateCalendarMonth.getFullYear(),
+                      reactivateCalendarMonth.getMonth() + 1,
+                      0
+                    ).getDate();
+                    const cells = [];
+                    const today = new Date();
+                    today.setHours(0, 0, 0, 0); // Reset time for accurate comparison
+
+                    // Empty cells before month starts
+                    for (let i = 0; i < startWeekday; i++) {
+                      cells.push(<View key={`empty-${i}`} style={styles.gridCell} />);
+                    }
+
+                    // Days of month
+                    for (let day = 1; day <= daysInMonth; day++) {
+                      const date = new Date(
+                        reactivateCalendarMonth.getFullYear(),
+                        reactivateCalendarMonth.getMonth(),
+                        day
+                      );
+                      date.setHours(0, 0, 0, 0);
+                      const dateKey = toDMY(date);
+                      const isValid = reactivateValidDatesSet.has(dateKey) && date >= today; // Only future dates
+                      const isSelected = reactivateDate && sameDay(date, reactivateDate);
+
+                      cells.push(
+                        <TouchableOpacity
+                          key={day}
+                          style={[
+                            styles.gridCell,
+                            !isValid && { opacity: 0.3 },
+                            isSelected && { backgroundColor: "#E7ECEA", borderRadius: 8 },
+                          ]}
+                          onPress={() => {
+                            if (isValid) {
+                              setReactivateDate(date);
+                              setReactivateSlot(null);
+                            }
+                          }}
+                          disabled={!isValid}
+                        >
+                          <Text style={[styles.gridDay, isSelected && { fontWeight: "800" }]}>
+                            {day}
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    }
+
+                    return cells;
+                  })()}
+                </View>
+
+                {/* Available slots section */}
+                <View style={{ marginTop: 16, paddingBottom: 12 }}>
+                  <Text style={[styles.sectionTitle, { fontSize: 16, marginBottom: 10 }]}>
+                    {reactivateDate ? `Available slots on ${fmtDateShort(reactivateDate)}` : "Select a date"}
+                  </Text>
+                  {!reactivateDate ? (
+                    <Text style={{ color: COLORS.dim, fontSize: 13 }}>
+                      Pick a date to see available slots.
+                    </Text>
+                  ) : availableSlotsForReactivateDate.length === 0 ? (
+                    <Text style={{ color: COLORS.dim, fontSize: 13 }}>
+                      No free slots on this date.
+                    </Text>
+                  ) : (
+                    <View style={{ gap: 8 }}>
+                      {availableSlotsForReactivateDate.map((s) => {
+                        const chosen =
+                          reactivateSlot &&
+                          reactivateSlot.startTime === s.startTime &&
+                          reactivateSlot.endTime === s.endTime;
+                        return (
+                          <TouchableOpacity
+                            key={`${s.startTime}-${s.endTime}`}
+                            onPress={() => setReactivateSlot(s)}
+                            style={[
+                              styles.editSlotCard,
+                              chosen && {
+                                backgroundColor: COLORS.accent,
+                                borderColor: COLORS.accent,
+                              },
+                            ]}
+                          >
+                            <Text style={[styles.editSlotText, chosen && { color: "white" }]}>
+                              {s.startTime} – {s.endTime}
+                            </Text>
+                          </TouchableOpacity>
+                        );
+                      })}
                     </View>
                   )}
                 </View>
 
                 {/* Action buttons */}
-                <View style={{ flexDirection: "row", gap: 10, marginTop: 12 }}>
+                <View style={{ flexDirection: "row", gap: 10, marginTop: 16 }}>
                   <TouchableOpacity
-                    onPress={() => handleCancelClick(selectedEdit)}
+                    onPress={closeReactivateModal}
+                    disabled={isReactivating}
                     style={[styles.secondary, { flex: 1 }]}
                   >
-                    <Text style={styles.secondaryText}>Cancel Appointment</Text>
+                    <Text style={styles.secondaryText}>Cancel</Text>
                   </TouchableOpacity>
                   <TouchableOpacity
-                    onPress={submitEdit}
-                    disabled={
-                      submitting ||
-                      (!showCustomTimeOption && !editSlot) ||
-                      (showCustomTimeOption && !customStartTime)
-                    }
-                    style={[styles.cta, { flex: 1 }, (submitting || (!showCustomTimeOption && !editSlot) || (showCustomTimeOption && !customStartTime)) && { opacity: 0.6 }]}
+                    onPress={handleReactivateAppointment}
+                    disabled={isReactivating || !reactivateDate || !reactivateSlot}
+                    style={[
+                      styles.cta,
+                      { flex: 1, backgroundColor: "#16a34a" },
+                      (isReactivating || !reactivateDate || !reactivateSlot) && { opacity: 0.6 },
+                    ]}
                   >
-                    <Text style={styles.ctaText}>{submitting ? "Saving…" : "Save Changes"}</Text>
+                    {isReactivating ? (
+                      <ActivityIndicator color="white" size="small" />
+                    ) : (
+                      <Text style={styles.ctaText}>Reactivate</Text>
+                    )}
                   </TouchableOpacity>
                 </View>
               </ScrollView>
@@ -1207,86 +1798,7 @@ export default function AppointmentsScreen() {
           </View>
         </View>
       </Modal>
-
-      {/* Delete Confirmation Modal */}
-      <DeleteConfirmModal
-        visible={showDeleteConfirm}
-        appointment={deletingAppointment}
-        onConfirm={handleConfirmCancel}
-        onCancel={handleCancelDelete}
-        isDeleting={isDeleting}
-      />
     </View>
-  );
-}
-
-// -------------------- Delete Confirmation Modal --------------------
-function DeleteConfirmModal({
-  visible,
-  appointment,
-  onConfirm,
-  onCancel,
-  isDeleting,
-}: {
-  visible: boolean;
-  appointment: UiApt | null;
-  onConfirm: () => void;
-  onCancel: () => void;
-  isDeleting: boolean;
-}) {
-  if (!appointment) return null;
-
-  return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onCancel}>
-      <View style={styles.overlay}>
-        <View style={[styles.modalCard, { maxWidth: 400 }]}>
-          <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>Confirm Cancellation</Text>
-          </View>
-
-          <View style={{ paddingVertical: 12 }}>
-            <Text style={{ color: COLORS.text, marginBottom: 12 }}>
-              Are you sure you want to cancel this appointment?
-            </Text>
-
-            <View style={styles.deleteAppointmentInfo}>
-              <Text style={styles.deleteAppointmentTitle}>
-                {appointment.serviceCode}
-              </Text>
-              <Text style={styles.deleteAppointmentDetails}>
-                {fmtDateShort(appointment.dateObj)} at {appointment.startTime}
-              </Text>
-              <Text style={styles.deleteAppointmentDetails}>
-                Duration: {appointment.duration} minutes
-              </Text>
-            </View>
-
-            <Text style={{ color: COLORS.dim, fontSize: 12, marginTop: 12 }}>
-              This action cannot be undone.
-            </Text>
-          </View>
-
-          <View style={{ flexDirection: "row", gap: 10, marginTop: 16 }}>
-            <TouchableOpacity
-              onPress={onCancel}
-              disabled={isDeleting}
-              style={[styles.secondary, { flex: 1 }]}
-            >
-              <Text style={styles.secondaryText}>Go Back</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              onPress={onConfirm}
-              disabled={isDeleting}
-              style={[styles.deleteBtn, { flex: 1 }, isDeleting && { opacity: 0.6 }]}
-            >
-              <Text style={styles.deleteBtnText}>
-                {isDeleting ? "Cancelling..." : "Cancel Appointment"}
-              </Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </View>
-    </Modal>
   );
 }
 
@@ -1392,6 +1904,7 @@ function CalendarAllMonths({
     </View>
   );
 }
+
 function MonthCard({
   year,
   monthIndex,
@@ -1519,14 +2032,24 @@ function MonthCard({
                   >
                     <View style={[styles.dot, { backgroundColor: codeColor(item.serviceCode) }]} />
                     <View style={{ flex: 1 }}>
-                      <Text style={styles.rowTitle}>
-                        {item.serviceCode} • {getPatientName(item.clientId)}
-                      </Text>
+                      <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 4 }}>
+                        <Text style={styles.rowTitle}>
+                          {item.serviceCode} • {getPatientName(item.clientId)}
+                        </Text>
+                        <View style={[
+                          styles.statusBadge,
+                          { backgroundColor: getStatusBadgeStyle(item.status).backgroundColor }
+                        ]}>
+                          <Text style={[
+                            styles.statusBadgeText,
+                            { color: getStatusBadgeStyle(item.status).color }
+                          ]}>
+                            {(item.status || "active").toUpperCase()}
+                          </Text>
+                        </View>
+                      </View>
                       <Text style={styles.rowSub}>
                         {item.startTime}–{item.endTime} • {item.duration}m
-                      </Text>
-                      <Text style={styles.statusText}>
-                        Status: <Text style={{ fontWeight: "800" }}>{item.status ?? "—"}</Text>
                       </Text>
                     </View>
                     <View style={{ gap: 8 }}>
@@ -1539,15 +2062,18 @@ function MonthCard({
                       >
                         <Text style={styles.ghostText}>Details</Text>
                       </TouchableOpacity>
-                      <TouchableOpacity 
-                        onPress={() => {
-                          setShowApptModal(false);
-                          onPressEdit(item);
-                        }} 
-                        style={styles.editBtn}
-                      >
-                        <Text style={styles.editText}>Edit</Text>
-                      </TouchableOpacity>
+                      {/* Only show Edit button if appointment is not cancelled */}
+                      {item.status?.toLowerCase() !== "cancelled" && (
+                        <TouchableOpacity 
+                          onPress={() => {
+                            setShowApptModal(false);
+                            onPressEdit(item);
+                          }} 
+                          style={styles.editBtn}
+                        >
+                          <Text style={styles.editText}>Edit</Text>
+                        </TouchableOpacity>
+                      )}
                     </View>
                   </View>
                 ))
@@ -1711,36 +2237,36 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     marginBottom: 8,
   },
- weekHeader: { 
-  flexDirection: "row", 
-  paddingHorizontal: 10, 
-  paddingBottom: 6,
-},
+  weekHeader: { 
+    flexDirection: "row", 
+    paddingHorizontal: 10, 
+    paddingBottom: 6,
+  },
   weekHeaderRow: { flexDirection: "row", gap: 6 },
-weekHdrText: { 
-  color: COLORS.dim, 
-  fontWeight: "700", 
-  textAlign: "center", 
-  width: "14.28%",  // Changed from flex: 1
-  fontSize: 12
-},
-grid: { 
-  paddingHorizontal: 10, 
-  paddingBottom: 10, 
-  flexDirection: "row",
-  flexWrap: "wrap",
-},
+  weekHdrText: { 
+    color: COLORS.dim, 
+    fontWeight: "700", 
+    textAlign: "center", 
+    width: "14.28%",
+    fontSize: 12
+  },
+  grid: { 
+    paddingHorizontal: 10, 
+    paddingBottom: 10, 
+    flexDirection: "row",
+    flexWrap: "wrap",
+  },
   weekRow: { flexDirection: "row", gap: 6 },
-gridCell: {
-  width: "14.28%",  // Changed from "13%"
-  aspectRatio: 1,
-  borderRadius: 8,  // Changed from 10
-  backgroundColor: "#F4F6F5",
-  padding: 4,  // Changed from 6
-  justifyContent: "space-between",
-  alignItems: "center",
-  marginBottom: 2,  // Added this
-},
+  gridCell: {
+    width: "14.28%",
+    aspectRatio: 1,
+    borderRadius: 8,
+    backgroundColor: "#F4F6F5",
+    padding: 4,
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 2,
+  },
   dayCell: {
     flex: 1,
     aspectRatio: 0.9,
@@ -1835,7 +2361,6 @@ gridCell: {
     paddingHorizontal: 10,
     paddingVertical: 8,
   },
- 
   pill: {
     alignSelf: "flex-start",
     paddingHorizontal: 10,
@@ -1873,16 +2398,7 @@ gridCell: {
     borderRadius: 10,
   },
   saveText: { color: "white", fontWeight: "800" },
-  cancelBtn: {
-    borderWidth: 1,
-    borderColor: COLORS.accent,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderRadius: 10,
-  },
-  cancelText: { color: COLORS.accent, fontWeight: "800" },
   scrollContent: { paddingBottom: 24 },
-
   // Edit modal slot card style
   editSlotCard: {
     backgroundColor: "#F4F6F5",
@@ -1898,7 +2414,6 @@ gridCell: {
     fontWeight: "700",
     fontSize: 14,
   },
-
   // Custom time slot styles
   customTimeContainer: {
     marginTop: 12,
@@ -1971,37 +2486,81 @@ gridCell: {
     borderColor: COLORS.line,
     paddingVertical: 10,
     paddingHorizontal: 12,
-     opacity: 0.6
+    opacity: 0.6
   },
-
-  // Delete confirmation styles
-  deleteAppointmentInfo: {
-    backgroundColor: "#FEE2E2",
+  // Cancel appointment styles
+  cancelBtn: {
+    backgroundColor: "#DC2626",
+    paddingVertical: 14,
+    borderRadius: 10,
+    alignItems: "center",
+  },
+  cancelBtnText: {
+    color: "white",
+    fontSize: 15,
+    fontWeight: "700",
+  },
+  cancelAppointmentInfo: {
+    backgroundColor: COLORS.bg,
+    borderRadius: 12,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: COLORS.line,
+  },
+  cancelAppointmentTitle: {
+    fontSize: 18,
+    fontWeight: "800",
+    color: COLORS.text,
+    marginBottom: 12,
+  },
+  cancelAppointmentDetails: {
+    fontSize: 14,
+    color: COLORS.dim,
+    marginBottom: 6,
+  },
+  warningBox: {
+    backgroundColor: "#FEF3C7",
     borderRadius: 8,
     padding: 12,
+    marginTop: 16,
     borderWidth: 1,
-    borderColor: "#FCA5A5",
+    borderColor: "#F59E0B",
   },
-  deleteAppointmentTitle: {
-    fontSize: 14,
-    fontWeight: "700",
-    color: "#991B1B",
-    marginBottom: 4,
-  },
-  deleteAppointmentDetails: {
-    fontSize: 12,
-    color: "#B91C1C",
-    marginTop: 2,
-  },
-  deleteBtn: {
-    backgroundColor: "#DC2626",
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderRadius: 10,
-  },
-  deleteBtnText: {
-    color: "white",
-    fontWeight: "800",
+  warningText: {
+    fontSize: 13,
+    color: "#92400E",
+    fontWeight: "600",
     textAlign: "center",
+  },
+  // Filter styles
+  filterBtn: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    backgroundColor: COLORS.bg,
+    borderWidth: 1,
+    borderColor: COLORS.line,
+  },
+  filterBtnActive: {
+    backgroundColor: COLORS.accent,
+    borderColor: COLORS.accent,
+  },
+  filterBtnText: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: COLORS.dim,
+  },
+  filterBtnTextActive: {
+    color: "white",
+  },
+  statusBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 12,
+  },
+  statusBadgeText: {
+    fontSize: 10,
+    fontWeight: "800",
+    letterSpacing: 0.5,
   },
 });
