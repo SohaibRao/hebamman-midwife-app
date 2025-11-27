@@ -52,7 +52,7 @@ function MenuButton() {
               <MenuItem icon="🏠" label="Dashboard" onPress={() => navigateTo("/dashboard")} />
               <MenuItem icon="👥" label="All Leads" onPress={() => navigateTo("/(app)/leads")} />
               <MenuItem icon="📅" label="Appointments" onPress={() => navigateTo("/(app)/appointments")} />
-               <MenuItem icon="🏥" label="Patients Requests" onPress={() => navigateTo("/(app)/requests")} />
+               <MenuItem icon="⏳" label="Patients Requests" onPress={() => navigateTo("/(app)/requests")} />
               <MenuItem icon="🏥" label="Patients" onPress={() => navigateTo("/(app)/patients")} />
               <MenuItem icon="👤" label="My Profile" onPress={() => navigateTo("/(app)/profile")} />
             </ScrollView>

@@ -11,6 +11,8 @@ import {
   View,
 } from "react-native";
 import { api } from "@/lib/api";
+import { useMidwifeProfile } from "@/hooks/useMidwifeProfile";
+import { useAuth } from "@/context/AuthContext";
 
 const COLORS = {
   bg: "#F6F8F7",
@@ -57,6 +59,14 @@ type Request = {
   updatedAt: string;
 };
 
+type Timetable = {
+  [weekday: string]: {
+    slots: {
+      [serviceCode: string]: { startTime: string; endTime: string }[];
+    };
+  };
+};
+
 type Props = {
   visible: boolean;
   request: Request | null;
@@ -97,6 +107,73 @@ const getRequestTypeLabel = (type: RequestType) => {
   return type === "edit" ? "Reschedule" : "Cancellation";
 };
 
+// Helper functions
+const pad2 = (n: number) => (n < 10 ? `0${n}` : `${n}`);
+const toDMY = (d: Date) => `${pad2(d.getDate())}/${pad2(d.getMonth() + 1)}/${d.getFullYear()}`;
+
+const weekdayName = (d: Date) => {
+  const days = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+  return days[d.getDay()];
+};
+
+// Helper to parse DMY date to Date object
+const parseDMY = (dmy: string): Date | null => {
+  try {
+    const [dd, mm, yyyy] = dmy.split("/").map(Number);
+    return new Date(yyyy, mm - 1, dd);
+  } catch {
+    return null;
+  }
+};
+
+// Fetch appointments for checking conflicts
+async function fetchAppointmentsForDate(
+  midwifeId: string,
+  date: Date
+): Promise<Array<{ startTime: string; endTime: string; serviceCode: string; appointmentId: string }>> {
+  try {
+    const clientET = new Date();
+    const payload = { midwifeId, clientET: clientET.toISOString() };
+
+    const res = await api(`/api/public/PostBirthAppointments/monthly-view`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+
+    const json = await readJsonSafe<any>(res);
+
+    if (!json || !json.success) return [];
+
+    const monthKey = `${date.getMonth() + 1}/${date.getFullYear()}`;
+    const bucket = json.data?.[monthKey];
+    if (!bucket) return [];
+
+    const dateKey = toDMY(date);
+    const appointments: Array<{ startTime: string; endTime: string; serviceCode: string; appointmentId: string }> = [];
+
+    // Extract all appointments for this date
+    Object.keys(bucket).forEach((serviceCode) => {
+      const apts = bucket[serviceCode] || [];
+      apts.forEach((apt: any) => {
+        if (apt.appointmentDate === dateKey) {
+          appointments.push({
+            startTime: apt.startTime,
+            endTime: apt.endTime,
+            serviceCode,
+            appointmentId: apt.appointmentId || "",
+          });
+        }
+      });
+    });
+
+    return appointments;
+  } catch (error) {
+    console.error("Error fetching appointments:", error);
+    return [];
+  }
+}
+
 export default function RequestDetailsModal({
   visible,
   request,
@@ -106,12 +183,101 @@ export default function RequestDetailsModal({
   getClientName,
   midwifeId,
 }: Props) {
+  const { user } = useAuth();
+  const pf = useMidwifeProfile(user?.id);
+  const midwifeProfile = pf.data as any;
+  const timetable: Timetable | undefined = midwifeProfile?.identity?.timetable;
+
   const [isProcessing, setIsProcessing] = useState(false);
 
   if (!request) return null;
 
   const isPending = request.status === "pending";
   const isReschedule = request.requestType === "edit";
+
+  // Validate if suggested time is available in midwife's timetable
+  const validateSuggestedTime = async (): Promise<{ valid: boolean; message?: string }> => {
+    if (!request.suggestedDate || !request.suggestedStartTime || !request.suggestedEndTime) {
+      return { valid: false, message: "No suggested date/time provided" };
+    }
+
+    // Refresh midwife profile to get latest timetable
+    await pf.refresh();
+    const latestTimetable: Timetable | undefined = pf.data?.identity?.timetable;
+
+    if (!latestTimetable) {
+      return { valid: false, message: "Unable to access midwife's timetable" };
+    }
+
+    // Parse the suggested date
+    const suggestedDate = parseDMY(request.suggestedDate);
+    if (!suggestedDate) {
+      return { valid: false, message: "Invalid date format" };
+    }
+
+    // Check if date is in the past
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    if (suggestedDate < today) {
+      return { valid: false, message: "Cannot schedule appointments in the past" };
+    }
+
+    // Get day of week
+    const dayName = weekdayName(suggestedDate);
+    const daySlots = latestTimetable[dayName];
+
+    // Check if midwife works on this day for this service
+    if (!daySlots?.slots?.[request.serviceCode]) {
+      return {
+        valid: false,
+        message: `The midwife is not available for ${SERVICE_NAMES[request.serviceCode] || request.serviceCode} on ${dayName}s`,
+      };
+    }
+
+    const availableSlots = daySlots.slots[request.serviceCode] || [];
+
+    // Check if the suggested time matches any of the timetable slots
+    const matchingSlot = availableSlots.find(
+      (slot) =>
+        slot.startTime === request.suggestedStartTime &&
+        slot.endTime === request.suggestedEndTime
+    );
+
+    if (!matchingSlot) {
+      return {
+        valid: false,
+        message: `The suggested time ${request.suggestedStartTime}-${request.suggestedEndTime} is not in the midwife's available schedule for this service`,
+      };
+    }
+
+    // Fetch current appointments for this date to check for conflicts
+    try {
+      const existingAppointments = await fetchAppointmentsForDate(midwifeId, suggestedDate);
+
+      // Check if the slot is already occupied (excluding the current appointment being rescheduled)
+      const isOccupied = existingAppointments.some(
+        (apt) =>
+          apt.startTime === request.suggestedStartTime &&
+          apt.endTime === request.suggestedEndTime &&
+          apt.appointmentId !== request.appointmentId // Don't count the appointment being rescheduled
+      );
+
+      if (isOccupied) {
+        return {
+          valid: false,
+          message: "This time slot is already booked with another appointment",
+        };
+      }
+    } catch (error) {
+      console.error("Error checking appointment conflicts:", error);
+      return {
+        valid: false,
+        message: "Unable to verify appointment availability. Please try again.",
+      };
+    }
+
+    return { valid: true };
+  };
 
   // Update request status
   const updateRequestStatus = async (status: "approved" | "rejected") => {
@@ -202,64 +368,84 @@ export default function RequestDetailsModal({
     );
   };
 
-  // Handle reschedule approval (with suggested date/time)
+  // Handle reschedule approval (with validation of suggested date/time)
   const handleApproveReschedule = async () => {
     if (!request.suggestedDate || !request.suggestedStartTime || !request.suggestedEndTime) {
       Alert.alert("Error", "No suggested date/time provided");
       return;
     }
 
-    Alert.alert(
-      "Approve Reschedule",
-      `Approve rescheduling to ${request.suggestedDate} at ${request.suggestedStartTime}-${request.suggestedEndTime}?`,
-      [
-        {
-          text: "Cancel",
-          style: "cancel",
-        },
-        {
-          text: "Approve",
-          onPress: async () => {
-            setIsProcessing(true);
+    setIsProcessing(true);
 
-            try {
-              // Reschedule the appointment
-              const payload: any = {
-                serviceCode: request.serviceCode,
-                appointmentId: request.appointmentId,
-                updatedDate: request.suggestedDate,
-                updatedStartTime: request.suggestedStartTime,
-                updatedEndTime: request.suggestedEndTime,
-              };
+    try {
+      // Validate the suggested time against current timetable
+      const validation = await validateSuggestedTime();
 
-              if (request.serviceCode !== "A1/A2") {
-                payload.midwifeId = request.midwifeId;
-                payload.clientId = request.clientId;
-              }
+      if (!validation.valid) {
+        setIsProcessing(false);
+        Alert.alert("Time Not Available", validation.message || "The suggested time is not available");
+        return;
+      }
 
-              const res = await api("/api/public/changeAppointmentSlots", {
-                method: "PUT",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(payload),
-              });
+      // If validation passes, proceed with confirmation
+      setIsProcessing(false);
 
-              const result = await readJsonSafe<any>(res);
-
-              if (!res.ok || !result.success) {
-                throw new Error(result.error || "Failed to reschedule appointment");
-              }
-
-              // Update request status
-              await updateRequestStatus("approved");
-            } catch (error: any) {
-              console.error("Error approving reschedule:", error);
-              Alert.alert("Error", error.message || "Failed to approve reschedule");
-              setIsProcessing(false);
-            }
+      Alert.alert(
+        "Approve Reschedule",
+        `Approve rescheduling to ${request.suggestedDate} at ${request.suggestedStartTime}-${request.suggestedEndTime}?`,
+        [
+          {
+            text: "Cancel",
+            style: "cancel",
           },
-        },
-      ]
-    );
+          {
+            text: "Approve",
+            onPress: async () => {
+              setIsProcessing(true);
+
+              try {
+                // Reschedule the appointment
+                const payload: any = {
+                  serviceCode: request.serviceCode,
+                  appointmentId: request.appointmentId,
+                  updatedDate: request.suggestedDate,
+                  updatedStartTime: request.suggestedStartTime,
+                  updatedEndTime: request.suggestedEndTime,
+                };
+
+                if (request.serviceCode !== "A1/A2") {
+                  payload.midwifeId = request.midwifeId;
+                  payload.clientId = request.clientId;
+                }
+
+                const res = await api("/api/public/changeAppointmentSlots", {
+                  method: "PUT",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify(payload),
+                });
+
+                const result = await readJsonSafe<any>(res);
+
+                if (!res.ok || !result.success) {
+                  throw new Error(result.error || "Failed to reschedule appointment");
+                }
+
+                // Update request status
+                await updateRequestStatus("approved");
+              } catch (error: any) {
+                console.error("Error approving reschedule:", error);
+                Alert.alert("Error", error.message || "Failed to approve reschedule");
+                setIsProcessing(false);
+              }
+            },
+          },
+        ]
+      );
+    } catch (error: any) {
+      console.error("Error validating time:", error);
+      Alert.alert("Error", "Failed to validate suggested time. Please try again.");
+      setIsProcessing(false);
+    }
   };
 
   // Handle reject
