@@ -28,16 +28,30 @@ const COLORS = {
 };
 
 export default function LoginScreen() {
-  const router = useRouter(); 
-  const { login, status, error } = useAuth();
+  const router = useRouter();
+  const { login, status, error, user, selectedMidwife } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
 
   useEffect(() => {
-    if (status === "signed-in") {
-      router.replace("/(app)/dashboard");
+    console.log("#user: ", user);
+    if (status === "signed-in" && user) {
+      // Route based on user role
+      if (user.role === "superuser") {
+        // Superuser: Check if they have a selected midwife
+        if (selectedMidwife) {
+          // Already has a selected midwife, go to dashboard
+          router.replace("/(app)/dashboard");
+        } else {
+          // Needs to select a midwife first
+          router.replace("/(admin)/midwife-selection");
+        }
+      } else if (user.role === "midwife") {
+        // Regular midwife goes directly to dashboard
+        router.replace("/(app)/dashboard");
+      }
     }
-  }, [status, router]);
+  }, [status, user, selectedMidwife, router]);
 
   const disabled = !email || !password || status === "signing-in";
 

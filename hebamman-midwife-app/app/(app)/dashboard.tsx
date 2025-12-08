@@ -28,6 +28,8 @@ const COLORS = {
   badgeDone: "#22C55E",
   badgeGray: "#9CA3AF",
   line: "#E5E7EB",
+  adminBanner: "#3B82F6",
+  adminBannerLight: "#EFF6FF",
 };
 
 // Service colors
@@ -169,10 +171,19 @@ async function fetchUserDetails(ids: string[]): Promise<Record<string, UserDetai
 
 export default function Dashboard() {
   const router = useRouter();
-  const { user, logout } = useAuth();
+  const { 
+    user, 
+    logout, 
+    isSuperuser, 
+    isManagingMidwife, 
+    selectedMidwife, 
+    clearSelectedMidwife,
+    getEffectiveUserId 
+  } = useAuth();
 
-  // Get profile by userId
-  const { data: profile, status: pStatus } = useMidwifeProfile(user?.id);
+  // Get profile by userId (for regular midwife) or by selected midwife's userId (for superuser)
+  const effectiveUserId = getEffectiveUserId();
+  const { data: profile, status: pStatus } = useMidwifeProfile(effectiveUserId);
   const midwifeId = profile?._id;
 
   // Fetch leads
@@ -209,16 +220,16 @@ export default function Dashboard() {
   }, [midwifeId, fetchPatients]);
 
   // Active patients count (converted status)
-const activePatientsCount = useMemo(() => {
-  return patients.filter(p => p.clientStatus === "converted").length;
-}, [patients]);
+  const activePatientsCount = useMemo(() => {
+    return patients.filter(p => p.clientStatus === "converted").length;
+  }, [patients]);
 
   // Latest 5 active patients
-const activePatients5 = useMemo(() => {
-  return patients
-    .filter(p => p.clientStatus === "converted")
-    .slice(0, 5);
-}, [patients]);
+  const activePatients5 = useMemo(() => {
+    return patients
+      .filter(p => p.clientStatus === "converted")
+      .slice(0, 5);
+  }, [patients]);
 
   // Fetch appointments
   const clientET = useMemo(() => new Date(), []);
@@ -322,12 +333,54 @@ const activePatients5 = useMemo(() => {
     });
   };
 
+  // Handle switch midwife (for superuser)
+  const handleSwitchMidwife = async () => {
+    await clearSelectedMidwife();
+    router.replace("/(admin)/midwife-selection");
+  };
+
+  // Get display name for welcome message
+  const getWelcomeName = () => {
+    if (isSuperuser && isManagingMidwife) {
+      return selectedMidwife?.name || "Admin";
+    }
+    return user?.username ?? "Midwife";
+  };
+
   return (
     <ScrollView style={{ flex: 1, backgroundColor: COLORS.bg }} contentContainerStyle={{ padding: 16 }}>
+      {/* Admin Banner - Show when superuser is managing a midwife */}
+      {isSuperuser && isManagingMidwife && (
+        <View style={styles.adminBanner}>
+          <View style={styles.adminBannerContent}>
+            <View style={styles.adminBannerLeft}>
+              <Text style={styles.adminBannerLabel}>Admin Mode</Text>
+              <Text style={styles.adminBannerName}>
+                Managing: {selectedMidwife?.name}
+              </Text>
+            </View>
+            <TouchableOpacity 
+              style={styles.switchMidwifeBtn}
+              onPress={handleSwitchMidwife}
+            >
+              <Text style={styles.switchMidwifeBtnText}>Switch</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      )}
+
       {/* Welcome */}
       <View style={{ marginBottom: 8 }}>
-        <Text style={styles.h1}>Welcome, {user?.username ?? "Midwife"}</Text>
-        <Text style={styles.sub}>Manage your patients & schedule at a glance.</Text>
+        <Text style={styles.h1}>
+          {isSuperuser && isManagingMidwife 
+            ? `Dashboard: ${selectedMidwife?.name}` 
+            : `Welcome, ${getWelcomeName()}`}
+        </Text>
+        <Text style={styles.sub}>
+          {isSuperuser && isManagingMidwife 
+            ? "You're viewing this midwife's dashboard as admin."
+            : "Manage your patients & schedule at a glance."}
+        </Text>
       </View>
 
       {/* Stat: Active Patients */}
@@ -455,7 +508,10 @@ const activePatients5 = useMemo(() => {
           ))}
       </View>
 
-  
+      {/* Logout Button */}
+      <TouchableOpacity style={styles.logout} onPress={logout}>
+        <Text style={styles.logoutText}>Logout</Text>
+      </TouchableOpacity>
 
       {/* Lead details modal */}
       {selectedLead && (
@@ -503,6 +559,48 @@ function Detail({ label, value }: { label: string; value?: string }) {
 }
 
 const styles = StyleSheet.create({
+  // Admin Banner Styles
+  adminBanner: {
+    backgroundColor: COLORS.adminBannerLight,
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 16,
+    borderLeftWidth: 4,
+    borderLeftColor: COLORS.adminBanner,
+  },
+  adminBannerContent: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  adminBannerLeft: {
+    flex: 1,
+  },
+  adminBannerLabel: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: COLORS.adminBanner,
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+  },
+  adminBannerName: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: COLORS.text,
+    marginTop: 2,
+  },
+  switchMidwifeBtn: {
+    backgroundColor: COLORS.adminBanner,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 8,
+  },
+  switchMidwifeBtnText: {
+    color: "#FFFFFF",
+    fontWeight: "700",
+    fontSize: 14,
+  },
+  
   h1: {
     fontSize: 24,
     fontWeight: "800",
