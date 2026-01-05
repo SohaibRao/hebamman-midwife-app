@@ -6,43 +6,46 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-
-const COLORS = {
-  text: "#1D1D1F",
-  dim: "#5C6B63",
-  accent: "#2E5A49",
-  sage: "#7F9086",
-};
+import { COLORS, SPACING, BORDER_RADIUS } from "@/constants/theme";
+import de from "@/constants/i18n";
 
 const SERVICE_COLORS: Record<string, string> = {
-  "A1/A2": "#7c3aed",
-  B1: "#2563eb",
-  B2: "#0ea5e9",
-  E1: "#f59e0b",
-  C1: "#16a34a",
-  C2: "#10b981",
-  D1: "#ef4444",
-  D2: "#f97316",
-  F1: "#a855f7",
+  "A1/A2": COLORS.serviceA1A2,
+  B1: COLORS.serviceB1,
+  B2: COLORS.serviceB2,
+  E1: COLORS.serviceE1,
+  C1: COLORS.serviceC1,
+  C2: COLORS.serviceC2,
+  D1: COLORS.serviceD1,
+  D2: COLORS.serviceD2,
+  F1: COLORS.serviceF1,
 };
 
 const getStatusBadgeStyle = (status?: string) => {
   const normalizedStatus = status?.toLowerCase() || "active";
   const styles: Record<string, any> = {
     active: {
-      backgroundColor: "#D1FAE5",
-      color: "#065F46",
+      backgroundColor: COLORS.successLight,
+      color: COLORS.success,
     },
     pending: {
-      backgroundColor: "#FEF3C7",
-      color: "#92400E",
+      backgroundColor: COLORS.warningLight,
+      color: COLORS.warning,
     },
     cancelled: {
-      backgroundColor: "#FEE2E2",
-      color: "#991B1B",
+      backgroundColor: COLORS.errorLight,
+      color: COLORS.error,
     },
   };
   return styles[normalizedStatus] || styles.active;
+};
+
+const getStatusLabel = (status?: string) => {
+  const normalizedStatus = status?.toLowerCase() || "active";
+  if (normalizedStatus === "active") return de.appointments.status.active;
+  if (normalizedStatus === "pending") return de.appointments.status.pending;
+  if (normalizedStatus === "cancelled") return de.appointments.status.cancelled;
+  return status?.toUpperCase() || "ACTIVE";
 };
 
 type UiApt = {
@@ -70,11 +73,11 @@ export default function AppointmentCard({
   onPressDetails,
   onPressEdit,
 }: Props) {
-  const codeColor = SERVICE_COLORS[appointment.serviceCode] ?? COLORS.sage;
+  const codeColor = SERVICE_COLORS[appointment.serviceCode] ?? COLORS.textSecondary;
   const isCancelled = appointment.status?.toLowerCase() === "cancelled";
   const statusStyle = getStatusBadgeStyle(appointment.status);
 
-  const dateStr = appointment.dateObj.toLocaleDateString(undefined, {
+  const dateStr = appointment.dateObj.toLocaleDateString('de-DE', {
     weekday: "short",
     day: "2-digit",
     month: "short",
@@ -95,22 +98,22 @@ export default function AppointmentCard({
             ]}
           >
             <Text style={[styles.statusBadgeText, { color: statusStyle.color }]}>
-              {(appointment.status || "active").toUpperCase()}
+              {getStatusLabel(appointment.status)}
             </Text>
           </View>
         </View>
         <Text style={styles.subtitle}>
           {dateStr} • {appointment.startTime}–{appointment.endTime} •{" "}
-          {appointment.duration}m
+          {appointment.duration}{de.appointments.minutes}
         </Text>
       </View>
       <View style={styles.actions}>
         <TouchableOpacity onPress={onPressDetails} style={styles.detailsButton}>
-          <Text style={styles.detailsButtonText}>Details</Text>
+          <Text style={styles.detailsButtonText}>{de.actions.viewDetails}</Text>
         </TouchableOpacity>
         {!isCancelled && (
           <TouchableOpacity onPress={onPressEdit} style={styles.editButton}>
-            <Text style={styles.editButtonText}>Edit</Text>
+            <Text style={styles.editButtonText}>{de.actions.edit}</Text>
           </TouchableOpacity>
         )}
       </View>
@@ -122,14 +125,14 @@ const styles = StyleSheet.create({
   card: {
     flexDirection: "row",
     alignItems: "center",
-    paddingVertical: 12,
-    gap: 10,
+    paddingVertical: SPACING.md,
+    gap: SPACING.sm,
   },
   dot: {
-    width: 14,
-    height: 14,
-    borderRadius: 7,
-    marginRight: 4,
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    marginRight: SPACING.xs,
   },
   content: {
     flex: 1,
@@ -137,21 +140,23 @@ const styles = StyleSheet.create({
   headerRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 8,
+    gap: SPACING.sm,
     marginBottom: 4,
   },
   title: {
     fontWeight: "700",
     color: COLORS.text,
+    fontSize: 15,
   },
   subtitle: {
-    color: COLORS.dim,
+    color: COLORS.textSecondary,
     marginTop: 2,
+    fontSize: 13,
   },
   statusBadge: {
-    paddingHorizontal: 8,
+    paddingHorizontal: SPACING.sm,
     paddingVertical: 3,
-    borderRadius: 12,
+    borderRadius: BORDER_RADIUS.sm,
   },
   statusBadgeText: {
     fontSize: 10,
@@ -159,29 +164,29 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
   },
   actions: {
-    gap: 8,
+    gap: SPACING.sm,
   },
   detailsButton: {
     borderWidth: 1,
-    borderColor: COLORS.accent,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 10,
+    borderColor: COLORS.primary,
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.sm,
+    borderRadius: BORDER_RADIUS.sm,
     backgroundColor: "transparent",
   },
   detailsButtonText: {
-    color: COLORS.accent,
+    color: COLORS.primary,
     fontWeight: "700",
     fontSize: 12,
   },
   editButton: {
-    backgroundColor: COLORS.accent,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 10,
+    backgroundColor: COLORS.primary,
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.sm,
+    borderRadius: BORDER_RADIUS.sm,
   },
   editButtonText: {
-    color: "white",
+    color: COLORS.background,
     fontWeight: "700",
     fontSize: 12,
   },

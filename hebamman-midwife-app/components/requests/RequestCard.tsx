@@ -6,41 +6,8 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-
-const COLORS = {
-  card: "#FFFFFF",
-  text: "#1D1D1F",
-  dim: "#5C6B63",
-  accent: "#2E5A49",
-  sage: "#7F9086",
-  line: "#E5E7EB",
-};
-
-const SERVICE_NAMES: Record<string, string> = {
-  "A1": "Initial Consultation A1",
-  "A1/A2": "Initial Consultation",
-  "B1": "Pre Birth Visit",
-  "B2": "Pre Birth Video",
-  "E1": "Birth Training",
-  "C1": "Early Care Visit",
-  "C2": "Early Care Video",
-  "D1": "Late Care Visit",
-  "D2": "Late Care Video",
-  "F1": "After Birth Gym",
-};
-
-const SERVICE_COLORS: Record<string, string> = {
-  "A1/A2": "#7c3aed",
-  "A1": "#7c3aed",
-  B1: "#2563eb",
-  B2: "#0ea5e9",
-  E1: "#f59e0b",
-  C1: "#16a34a",
-  C2: "#10b981",
-  D1: "#ef4444",
-  D2: "#f97316",
-  F1: "#a855f7",
-};
+import { COLORS, SPACING, BORDER_RADIUS } from "@/constants/theme";
+import de from "@/constants/i18n";
 
 type RequestType = "edit" | "cancelled";
 type RequestStatus = "pending" | "approved" | "rejected";
@@ -64,26 +31,26 @@ type Props = {
 };
 
 const getRequestTypeLabel = (type: RequestType) => {
-  return type === "edit" ? "Reschedule" : "Cancellation";
+  return type === "edit" ? de.requests.types.reschedule : de.requests.types.cancellation;
 };
 
 const getRequestTypeColor = (type: RequestType) => {
-  return type === "edit" ? "#3B82F6" : "#EF4444";
+  return type === "edit" ? COLORS.info : COLORS.error;
 };
 
 const getStatusBadgeStyle = (status: RequestStatus) => {
   const styles: Record<RequestStatus, any> = {
     pending: {
-      backgroundColor: "#FEF3C7",
-      color: "#92400E",
+      backgroundColor: COLORS.warningLight,
+      color: COLORS.warningDark,
     },
     approved: {
-      backgroundColor: "#D1FAE5",
-      color: "#065F46",
+      backgroundColor: COLORS.successLight,
+      color: COLORS.successDark,
     },
     rejected: {
-      backgroundColor: "#FEE2E2",
-      color: "#991B1B",
+      backgroundColor: COLORS.errorLight,
+      color: COLORS.errorDark,
     },
   };
   return styles[status];
@@ -92,7 +59,7 @@ const getStatusBadgeStyle = (status: RequestStatus) => {
 const formatDate = (dateStr: string) => {
   try {
     const date = new Date(dateStr);
-    return date.toLocaleDateString(undefined, {
+    return date.toLocaleDateString('de-DE', {
       weekday: "short",
       day: "2-digit",
       month: "short",
@@ -103,8 +70,12 @@ const formatDate = (dateStr: string) => {
 };
 
 export default function RequestCard({ request, clientName, onPress }: Props) {
-  const serviceColor = SERVICE_COLORS[request.serviceCode] ?? COLORS.sage;
+  const serviceColor = COLORS[`service${request.serviceCode.replace('/', '')}` as keyof typeof COLORS] ?? COLORS.textSecondary;
   const statusStyle = getStatusBadgeStyle(request.status);
+
+  const statusLabel = request.status === 'pending' ? de.requests.status.pending :
+                      request.status === 'approved' ? de.requests.status.approved :
+                      de.requests.status.rejected;
 
   return (
     <TouchableOpacity onPress={onPress} style={styles.card}>
@@ -119,14 +90,14 @@ export default function RequestCard({ request, clientName, onPress }: Props) {
             <View style={styles.serviceRow}>
               <View style={[styles.serviceDot, { backgroundColor: serviceColor }]} />
               <Text style={styles.serviceText}>
-                {request.serviceCode} • {SERVICE_NAMES[request.serviceCode] || request.serviceCode}
+                {request.serviceCode} • {de.serviceCodes[request.serviceCode as keyof typeof de.serviceCodes] || request.serviceCode}
               </Text>
             </View>
           </View>
 
           <View style={[styles.statusBadge, { backgroundColor: statusStyle.backgroundColor }]}>
             <Text style={[styles.statusText, { color: statusStyle.color }]}>
-              {request.status.toUpperCase()}
+              {statusLabel.toUpperCase()}
             </Text>
           </View>
         </View>
@@ -145,7 +116,7 @@ export default function RequestCard({ request, clientName, onPress }: Props) {
                 { color: getRequestTypeColor(request.requestType) },
               ]}
             >
-              {getRequestTypeLabel(request.requestType)} Request
+              {getRequestTypeLabel(request.requestType)} Anfrage
             </Text>
           </View>
         </View>
@@ -153,7 +124,7 @@ export default function RequestCard({ request, clientName, onPress }: Props) {
         {/* Suggested Date/Time for Reschedule */}
         {request.requestType === "edit" && request.suggestedDate && (
           <View style={styles.suggestionRow}>
-            <Text style={styles.suggestionLabel}>Suggested:</Text>
+            <Text style={styles.suggestionLabel}>Vorgeschlagen:</Text>
             <Text style={styles.suggestionValue}>
               {request.suggestedDate} • {request.suggestedStartTime}-{request.suggestedEndTime}
             </Text>
@@ -163,7 +134,7 @@ export default function RequestCard({ request, clientName, onPress }: Props) {
         {/* Note Preview */}
         {request.note && (
           <View style={styles.notePreview}>
-            <Text style={styles.noteLabel}>Note:</Text>
+            <Text style={styles.noteLabel}>Notiz:</Text>
             <Text style={styles.noteText} numberOfLines={2}>
               {request.note}
             </Text>
@@ -173,7 +144,7 @@ export default function RequestCard({ request, clientName, onPress }: Props) {
         {/* Date */}
         <View style={styles.footer}>
           <Text style={styles.dateText}>{formatDate(request.createdAt)}</Text>
-          <Text style={styles.viewDetails}>View Details →</Text>
+          <Text style={styles.viewDetails}>Details ansehen →</Text>
         </View>
       </View>
     </TouchableOpacity>
@@ -183,7 +154,7 @@ export default function RequestCard({ request, clientName, onPress }: Props) {
 const styles = StyleSheet.create({
   card: {
     backgroundColor: COLORS.card,
-    borderRadius: 12,
+    borderRadius: BORDER_RADIUS.lg,
     overflow: "hidden",
     flexDirection: "row",
     shadowColor: "#000",
@@ -197,24 +168,24 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
-    padding: 16,
+    padding: SPACING.lg,
   },
   headerRow: {
     flexDirection: "row",
     alignItems: "flex-start",
-    marginBottom: 12,
-    gap: 12,
+    marginBottom: SPACING.md,
+    gap: SPACING.md,
   },
   clientName: {
     fontSize: 16,
     fontWeight: "700",
     color: COLORS.text,
-    marginBottom: 4,
+    marginBottom: SPACING.xs,
   },
   serviceRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 6,
+    gap: SPACING.xs,
   },
   serviceDot: {
     width: 8,
@@ -223,13 +194,13 @@ const styles = StyleSheet.create({
   },
   serviceText: {
     fontSize: 13,
-    color: COLORS.dim,
+    color: COLORS.textSecondary,
     fontWeight: "600",
   },
   statusBadge: {
-    paddingHorizontal: 10,
+    paddingHorizontal: SPACING.sm,
     paddingVertical: 5,
-    borderRadius: 12,
+    borderRadius: BORDER_RADIUS.md,
   },
   statusText: {
     fontSize: 10,
@@ -237,12 +208,12 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
   },
   requestTypeRow: {
-    marginBottom: 10,
+    marginBottom: SPACING.sm,
   },
   requestTypeBadge: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 8,
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.xs,
+    borderRadius: BORDER_RADIUS.sm,
     alignSelf: "flex-start",
   },
   requestTypeText: {
@@ -252,19 +223,19 @@ const styles = StyleSheet.create({
   suggestionRow: {
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: 10,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    backgroundColor: "#F0F9FF",
-    borderRadius: 8,
+    marginBottom: SPACING.sm,
+    paddingVertical: SPACING.sm,
+    paddingHorizontal: SPACING.md,
+    backgroundColor: COLORS.infoLight,
+    borderRadius: BORDER_RADIUS.sm,
     borderLeftWidth: 3,
-    borderLeftColor: "#3B82F6",
+    borderLeftColor: COLORS.info,
   },
   suggestionLabel: {
     fontSize: 12,
     fontWeight: "700",
-    color: COLORS.dim,
-    marginRight: 6,
+    color: COLORS.textSecondary,
+    marginRight: SPACING.xs,
   },
   suggestionValue: {
     fontSize: 12,
@@ -272,18 +243,18 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
   notePreview: {
-    marginBottom: 10,
-    padding: 10,
+    marginBottom: SPACING.sm,
+    padding: SPACING.sm,
     backgroundColor: COLORS.card,
-    borderRadius: 8,
+    borderRadius: BORDER_RADIUS.sm,
     borderWidth: 1,
-    borderColor: COLORS.line,
+    borderColor: COLORS.border,
   },
   noteLabel: {
     fontSize: 11,
     fontWeight: "700",
-    color: COLORS.dim,
-    marginBottom: 4,
+    color: COLORS.textSecondary,
+    marginBottom: SPACING.xs,
   },
   noteText: {
     fontSize: 13,
@@ -294,16 +265,16 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginTop: 4,
+    marginTop: SPACING.xs,
   },
   dateText: {
     fontSize: 12,
-    color: COLORS.sage,
+    color: COLORS.textSecondary,
     fontWeight: "600",
   },
   viewDetails: {
     fontSize: 12,
-    color: COLORS.accent,
+    color: COLORS.primary,
     fontWeight: "700",
   },
 });

@@ -8,27 +8,8 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-
-const COLORS = {
-  bg: "#F6F8F7",
-  card: "#FFFFFF",
-  text: "#1D1D1F",
-  dim: "#5C6B63",
-  accent: "#2E5A49",
-  line: "#E5E7EB",
-};
-
-const SERVICE_NAMES: Record<string, string> = {
-  "A1/A2": "Initial Consultation",
-  B1: "Pre Birth Visit",
-  B2: "Pre Birth Video",
-  E1: "Birth Training",
-  C1: "Early Care Visit",
-  C2: "Early Care Video",
-  D1: "Late Care Visit",
-  D2: "Late Care Video",
-  F1: "After Birth Gym",
-};
+import { COLORS, SPACING, BORDER_RADIUS } from "@/constants/theme";
+import de from "@/constants/i18n";
 
 type UiApt = {
   serviceCode: string;
@@ -64,34 +45,34 @@ export default function CancelConfirmModal({
       <View style={styles.overlay}>
         <View style={styles.modalCard}>
           <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>Cancel Appointment</Text>
+            <Text style={styles.modalTitle}>{de.appointments.cancelAppointment}</Text>
           </View>
 
           <View style={styles.content}>
             <Text style={styles.question}>
-              Are you sure you want to cancel this appointment?
+              {de.appointments.confirmCancel}
             </Text>
 
             <View style={styles.appointmentInfo}>
               <Text style={styles.appointmentTitle}>
-                {SERVICE_NAMES[appointment.serviceCode] || appointment.serviceCode}
+                {appointment.serviceCode}
               </Text>
               <Text style={styles.appointmentDetail}>
-                Patient: {getPatientName(appointment.clientId)}
+                {de.appointments.patientName}: {getPatientName(appointment.clientId)}
               </Text>
               <Text style={styles.appointmentDetail}>
-                Date: {appointment.appointmentDate}
+                {de.common.date}: {appointment.appointmentDate}
               </Text>
               <Text style={styles.appointmentDetail}>
-                Time: {appointment.startTime} - {appointment.endTime}
+                {de.common.time}: {appointment.startTime} - {appointment.endTime}
               </Text>
               <Text style={styles.appointmentDetail}>
-                Duration: {appointment.duration} minutes
+                {de.appointments.duration}: {appointment.duration} {de.appointments.minutes}
               </Text>
             </View>
 
             <View style={styles.warningBox}>
-              <Text style={styles.warningText}>⚠️ This action cannot be undone</Text>
+              <Text style={styles.warningText}>⚠️ Diese Aktion kann nicht rückgängig gemacht werden</Text>
             </View>
           </View>
 
@@ -101,7 +82,7 @@ export default function CancelConfirmModal({
               disabled={isCanceling}
               style={styles.secondaryButton}
             >
-              <Text style={styles.secondaryButtonText}>Go Back</Text>
+              <Text style={styles.secondaryButtonText}>{de.actions.back}</Text>
             </TouchableOpacity>
             <TouchableOpacity
               onPress={onConfirm}
@@ -111,7 +92,7 @@ export default function CancelConfirmModal({
               {isCanceling ? (
                 <ActivityIndicator color="white" size="small" />
               ) : (
-                <Text style={styles.cancelButtonText}>Yes, Cancel It</Text>
+                <Text style={styles.cancelButtonText}>Ja, absagen</Text>
               )}
             </TouchableOpacity>
           </View>
@@ -127,12 +108,12 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(0,0,0,.25)",
     alignItems: "center",
     justifyContent: "center",
-    padding: 20,
+    padding: SPACING.lg,
   },
   modalCard: {
     backgroundColor: COLORS.card,
-    borderRadius: 12,
-    padding: 18,
+    borderRadius: BORDER_RADIUS.lg,
+    padding: SPACING.lg,
     width: "100%",
     maxWidth: 400,
     shadowColor: "#000",
@@ -142,7 +123,7 @@ const styles = StyleSheet.create({
     elevation: 6,
   },
   modalHeader: {
-    marginBottom: 12,
+    marginBottom: SPACING.md,
   },
   modalTitle: {
     fontSize: 18,
@@ -150,72 +131,72 @@ const styles = StyleSheet.create({
     color: COLORS.text,
   },
   content: {
-    paddingVertical: 12,
+    paddingVertical: SPACING.md,
   },
   question: {
     color: COLORS.text,
-    marginBottom: 16,
+    marginBottom: SPACING.lg,
     fontSize: 15,
   },
   appointmentInfo: {
-    backgroundColor: COLORS.bg,
-    borderRadius: 12,
-    padding: 16,
+    backgroundColor: COLORS.backgroundGray,
+    borderRadius: BORDER_RADIUS.md,
+    padding: SPACING.lg,
     borderWidth: 1,
-    borderColor: COLORS.line,
+    borderColor: COLORS.border,
   },
   appointmentTitle: {
     fontSize: 18,
     fontWeight: "800",
     color: COLORS.text,
-    marginBottom: 12,
+    marginBottom: SPACING.md,
   },
   appointmentDetail: {
     fontSize: 14,
-    color: COLORS.dim,
-    marginBottom: 6,
+    color: COLORS.textSecondary,
+    marginBottom: SPACING.xs,
   },
   warningBox: {
-    backgroundColor: "#FEF3C7",
-    borderRadius: 8,
-    padding: 12,
-    marginTop: 16,
+    backgroundColor: COLORS.warningLight,
+    borderRadius: BORDER_RADIUS.sm,
+    padding: SPACING.md,
+    marginTop: SPACING.lg,
     borderWidth: 1,
-    borderColor: "#F59E0B",
+    borderColor: COLORS.warning,
   },
   warningText: {
     fontSize: 13,
-    color: "#92400E",
+    color: COLORS.warningDark,
     fontWeight: "600",
     textAlign: "center",
   },
   buttonRow: {
     flexDirection: "row",
-    gap: 10,
-    marginTop: 16,
+    gap: SPACING.sm,
+    marginTop: SPACING.lg,
   },
   secondaryButton: {
     flex: 1,
     borderWidth: 1,
-    borderColor: COLORS.accent,
-    paddingVertical: 12,
-    borderRadius: 10,
+    borderColor: COLORS.primary,
+    paddingVertical: SPACING.md,
+    borderRadius: BORDER_RADIUS.md,
     backgroundColor: "transparent",
     alignItems: "center",
   },
   secondaryButtonText: {
-    color: COLORS.accent,
+    color: COLORS.primary,
     fontWeight: "800",
   },
   cancelButton: {
     flex: 1,
-    backgroundColor: "#DC2626",
-    paddingVertical: 12,
-    borderRadius: 10,
+    backgroundColor: COLORS.error,
+    paddingVertical: SPACING.md,
+    borderRadius: BORDER_RADIUS.md,
     alignItems: "center",
   },
   cancelButtonText: {
-    color: "white",
+    color: COLORS.background,
     fontSize: 15,
     fontWeight: "800",
   },

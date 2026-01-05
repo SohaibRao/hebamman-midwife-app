@@ -13,32 +13,8 @@ import {
 import { api } from "@/lib/api";
 import { useMidwifeProfile } from "@/hooks/useMidwifeProfile";
 import { useAuth } from "@/context/AuthContext";
-
-const COLORS = {
-  bg: "#F6F8F7",
-  card: "#FFFFFF",
-  text: "#1D1D1F",
-  dim: "#5C6B63",
-  accent: "#2E5A49",
-  sage: "#7F9086",
-  green: "#22C55E",
-  red: "#EF4444",
-  blue: "#3B82F6",
-  line: "#E5E7EB",
-};
-
-const SERVICE_NAMES: Record<string, string> = {
-  "A1": "Initial Consultation A1",
-  "A1/A2": "Initial Consultation",
-  "B1": "Pre Birth Visit",
-  "B2": "Pre Birth Video",
-  "E1": "Birth Training",
-  "C1": "Early Care Visit",
-  "C2": "Early Care Video",
-  "D1": "Late Care Visit",
-  "D2": "Late Care Video",
-  "F1": "After Birth Gym",
-};
+import { COLORS, SPACING, BORDER_RADIUS } from "@/constants/theme";
+import de from "@/constants/i18n";
 
 type RequestType = "edit" | "cancelled";
 type RequestStatus = "pending" | "approved" | "rejected";
@@ -90,7 +66,7 @@ async function readJsonSafe<T = any>(res: Response): Promise<T> {
 const formatDateTime = (dateStr: string) => {
   try {
     const date = new Date(dateStr);
-    return date.toLocaleDateString(undefined, {
+    return date.toLocaleDateString('de-DE', {
       weekday: "long",
       day: "2-digit",
       month: "long",
@@ -104,7 +80,7 @@ const formatDateTime = (dateStr: string) => {
 };
 
 const getRequestTypeLabel = (type: RequestType) => {
-  return type === "edit" ? "Reschedule" : "Cancellation";
+  return type === "edit" ? de.requests.types.reschedule : de.requests.types.cancellation;
 };
 
 // Helper functions
@@ -112,7 +88,7 @@ const pad2 = (n: number) => (n < 10 ? `0${n}` : `${n}`);
 const toDMY = (d: Date) => `${pad2(d.getDate())}/${pad2(d.getMonth() + 1)}/${d.getFullYear()}`;
 
 const weekdayName = (d: Date) => {
-  const days = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+  const days = ["Sonntag", "Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag"];
   return days[d.getDay()];
 };
 
@@ -198,7 +174,7 @@ export default function RequestDetailsModal({
   // Validate if suggested time is available in midwife's timetable
   const validateSuggestedTime = async (): Promise<{ valid: boolean; message?: string }> => {
     if (!request.suggestedDate || !request.suggestedStartTime || !request.suggestedEndTime) {
-      return { valid: false, message: "No suggested date/time provided" };
+      return { valid: false, message: "Kein vorgeschlagenes Datum/Uhrzeit angegeben" };
     }
 
     // Refresh midwife profile to get latest timetable
@@ -206,20 +182,20 @@ export default function RequestDetailsModal({
     const latestTimetable: Timetable | undefined = pf.data?.identity?.timetable;
 
     if (!latestTimetable) {
-      return { valid: false, message: "Unable to access midwife's timetable" };
+      return { valid: false, message: "Zugriff auf den Zeitplan der Hebamme nicht möglich" };
     }
 
     // Parse the suggested date
     const suggestedDate = parseDMY(request.suggestedDate);
     if (!suggestedDate) {
-      return { valid: false, message: "Invalid date format" };
+      return { valid: false, message: "Ungültiges Datumsformat" };
     }
 
     // Check if date is in the past
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     if (suggestedDate < today) {
-      return { valid: false, message: "Cannot schedule appointments in the past" };
+      return { valid: false, message: "Termine können nicht in der Vergangenheit geplant werden" };
     }
 
     // Get day of week
@@ -230,7 +206,7 @@ export default function RequestDetailsModal({
     if (!daySlots?.slots?.[request.serviceCode]) {
       return {
         valid: false,
-        message: `The midwife is not available for ${SERVICE_NAMES[request.serviceCode] || request.serviceCode} on ${dayName}s`,
+        message: `Die Hebamme ist nicht verfügbar für ${de.serviceCodes[request.serviceCode as keyof typeof de.serviceCodes] || request.serviceCode} an ${dayName}en`,
       };
     }
 
@@ -246,7 +222,7 @@ export default function RequestDetailsModal({
     if (!matchingSlot) {
       return {
         valid: false,
-        message: `The suggested time ${request.suggestedStartTime}-${request.suggestedEndTime} is not in the midwife's available schedule for this service`,
+        message: `Die vorgeschlagene Zeit ${request.suggestedStartTime}-${request.suggestedEndTime} ist nicht im verfügbaren Zeitplan der Hebamme für diesen Service`,
       };
     }
 
@@ -265,14 +241,14 @@ export default function RequestDetailsModal({
       if (isOccupied) {
         return {
           valid: false,
-          message: "This time slot is already booked with another appointment",
+          message: "Dieser Zeitslot ist bereits mit einem anderen Termin gebucht",
         };
       }
     } catch (error) {
       console.error("Error checking appointment conflicts:", error);
       return {
         valid: false,
-        message: "Unable to verify appointment availability. Please try again.",
+        message: "Terminverfügbarkeit kann nicht überprüft werden. Bitte versuchen Sie es erneut.",
       };
     }
 
@@ -300,15 +276,15 @@ export default function RequestDetailsModal({
       }
 
       Alert.alert(
-        "Success",
-        `Request ${status === "approved" ? "approved" : "rejected"} successfully`
+        "Erfolgreich",
+        `Anfrage erfolgreich ${status === "approved" ? "genehmigt" : "abgelehnt"}`
       );
 
       onClose();
       onRequestUpdated();
     } catch (error: any) {
       console.error("Error updating request status:", error);
-      Alert.alert("Error", error.message || "Failed to update request");
+      Alert.alert("Fehler", error.message || "Anfrage konnte nicht aktualisiert werden");
     } finally {
       setIsProcessing(false);
     }
@@ -317,15 +293,15 @@ export default function RequestDetailsModal({
   // Handle cancel approval
   const handleApproveCancellation = async () => {
     Alert.alert(
-      "Approve Cancellation",
-      "Are you sure you want to approve this cancellation request? This will cancel the appointment.",
+      "Stornierung genehmigen",
+      "Möchten Sie diese Stornierungsanfrage wirklich genehmigen? Dies wird den Termin absagen.",
       [
         {
-          text: "Cancel",
+          text: "Abbrechen",
           style: "cancel",
         },
         {
-          text: "Approve",
+          text: "Genehmigen",
           style: "destructive",
           onPress: async () => {
             setIsProcessing(true);
@@ -359,7 +335,7 @@ export default function RequestDetailsModal({
               await updateRequestStatus("approved");
             } catch (error: any) {
               console.error("Error approving cancellation:", error);
-              Alert.alert("Error", error.message || "Failed to approve cancellation");
+              Alert.alert("Fehler", error.message || "Stornierung konnte nicht genehmigt werden");
               setIsProcessing(false);
             }
           },
@@ -371,7 +347,7 @@ export default function RequestDetailsModal({
   // Handle reschedule approval (with validation of suggested date/time)
   const handleApproveReschedule = async () => {
     if (!request.suggestedDate || !request.suggestedStartTime || !request.suggestedEndTime) {
-      Alert.alert("Error", "No suggested date/time provided");
+      Alert.alert("Fehler", "Kein vorgeschlagenes Datum/Uhrzeit angegeben");
       return;
     }
 
@@ -383,7 +359,7 @@ export default function RequestDetailsModal({
 
       if (!validation.valid) {
         setIsProcessing(false);
-        Alert.alert("Time Not Available", validation.message || "The suggested time is not available");
+        Alert.alert("Zeit nicht verfügbar", validation.message || "Die vorgeschlagene Zeit ist nicht verfügbar");
         return;
       }
 
@@ -391,15 +367,15 @@ export default function RequestDetailsModal({
       setIsProcessing(false);
 
       Alert.alert(
-        "Approve Reschedule",
-        `Approve rescheduling to ${request.suggestedDate} at ${request.suggestedStartTime}-${request.suggestedEndTime}?`,
+        "Umplanung genehmigen",
+        `Umplanung auf ${request.suggestedDate} um ${request.suggestedStartTime}-${request.suggestedEndTime} genehmigen?`,
         [
           {
-            text: "Cancel",
+            text: "Abbrechen",
             style: "cancel",
           },
           {
-            text: "Approve",
+            text: "Genehmigen",
             onPress: async () => {
               setIsProcessing(true);
 
@@ -434,7 +410,7 @@ export default function RequestDetailsModal({
                 await updateRequestStatus("approved");
               } catch (error: any) {
                 console.error("Error approving reschedule:", error);
-                Alert.alert("Error", error.message || "Failed to approve reschedule");
+                Alert.alert("Fehler", error.message || "Umplanung konnte nicht genehmigt werden");
                 setIsProcessing(false);
               }
             },
@@ -443,7 +419,7 @@ export default function RequestDetailsModal({
       );
     } catch (error: any) {
       console.error("Error validating time:", error);
-      Alert.alert("Error", "Failed to validate suggested time. Please try again.");
+      Alert.alert("Fehler", "Vorgeschlagene Zeit konnte nicht validiert werden. Bitte versuchen Sie es erneut.");
       setIsProcessing(false);
     }
   };
@@ -451,15 +427,15 @@ export default function RequestDetailsModal({
   // Handle reject
   const handleReject = () => {
     Alert.alert(
-      "Reject Request",
-      "Are you sure you want to reject this request?",
+      "Anfrage ablehnen",
+      "Möchten Sie diese Anfrage wirklich ablehnen?",
       [
         {
-          text: "Cancel",
+          text: "Abbrechen",
           style: "cancel",
         },
         {
-          text: "Reject",
+          text: "Ablehnen",
           style: "destructive",
           onPress: () => updateRequestStatus("rejected"),
         },
@@ -473,7 +449,7 @@ export default function RequestDetailsModal({
         <View style={styles.modalCard}>
           {/* Header */}
           <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>Request Details</Text>
+            <Text style={styles.modalTitle}>Anfragedetails</Text>
             <TouchableOpacity onPress={onClose} disabled={isProcessing}>
               <Text style={styles.closeButton}>✕</Text>
             </TouchableOpacity>
@@ -483,23 +459,23 @@ export default function RequestDetailsModal({
             {/* Request Type Badge */}
             <View style={styles.requestTypeBadge}>
               <Text style={styles.requestTypeBadgeText}>
-                {getRequestTypeLabel(request.requestType)} Request
+                {getRequestTypeLabel(request.requestType)} Anfrage
               </Text>
             </View>
 
             {/* Status Badge */}
             <View style={styles.statusSection}>
-              <Text style={styles.sectionLabel}>Status</Text>
+              <Text style={styles.sectionLabel}>{de.common.status}</Text>
               <View
                 style={[
                   styles.statusBadgeLarge,
                   {
                     backgroundColor:
                       request.status === "pending"
-                        ? "#FEF3C7"
+                        ? COLORS.warningLight
                         : request.status === "approved"
-                        ? "#D1FAE5"
-                        : "#FEE2E2",
+                        ? COLORS.successLight
+                        : COLORS.errorLight,
                   },
                 ]}
               >
@@ -509,36 +485,38 @@ export default function RequestDetailsModal({
                     {
                       color:
                         request.status === "pending"
-                          ? "#92400E"
+                          ? COLORS.warningDark
                           : request.status === "approved"
-                          ? "#065F46"
-                          : "#991B1B",
+                          ? COLORS.successDark
+                          : COLORS.errorDark,
                     },
                   ]}
                 >
-                  {request.status.toUpperCase()}
+                  {(request.status === "pending" ? de.requests.status.pending :
+                    request.status === "approved" ? de.requests.status.approved :
+                    de.requests.status.rejected).toUpperCase()}
                 </Text>
               </View>
             </View>
 
             {/* Patient & Service Info */}
             <View style={styles.section}>
-              <Text style={styles.sectionLabel}>Appointment Information</Text>
-              <DetailRow label="Patient" value={getClientName(request.clientId)} />
+              <Text style={styles.sectionLabel}>Termindetails</Text>
+              <DetailRow label="Patientin" value={getClientName(request.clientId)} />
               <DetailRow
-                label="Service"
-                value={`${request.serviceCode} - ${SERVICE_NAMES[request.serviceCode] || request.serviceCode}`}
+                label={de.appointments.serviceCode}
+                value={`${request.serviceCode} - ${de.serviceCodes[request.serviceCode as keyof typeof de.serviceCodes] || request.serviceCode}`}
               />
             </View>
 
             {/* Suggested Date/Time (for reschedule) */}
             {isReschedule && request.suggestedDate && (
               <View style={styles.section}>
-                <Text style={styles.sectionLabel}>Suggested New Schedule</Text>
+                <Text style={styles.sectionLabel}>Vorgeschlagener neuer Zeitplan</Text>
                 <View style={styles.suggestionBox}>
-                  <DetailRow label="Date" value={request.suggestedDate} />
+                  <DetailRow label={de.common.date} value={request.suggestedDate} />
                   <DetailRow
-                    label="Time"
+                    label={de.common.time}
                     value={`${request.suggestedStartTime} - ${request.suggestedEndTime}`}
                   />
                 </View>
@@ -548,7 +526,7 @@ export default function RequestDetailsModal({
             {/* Note */}
             {request.note && (
               <View style={styles.section}>
-                <Text style={styles.sectionLabel}>Patient's Note</Text>
+                <Text style={styles.sectionLabel}>Notiz der Patientin</Text>
                 <View style={styles.noteBox}>
                   <Text style={styles.noteText}>{request.note}</Text>
                 </View>
@@ -557,9 +535,9 @@ export default function RequestDetailsModal({
 
             {/* Timestamps */}
             <View style={styles.section}>
-              <DetailRow label="Requested on" value={formatDateTime(request.createdAt)} />
+              <DetailRow label="Angefordert am" value={formatDateTime(request.createdAt)} />
               {request.updatedAt !== request.createdAt && (
-                <DetailRow label="Last updated" value={formatDateTime(request.updatedAt)} />
+                <DetailRow label="Zuletzt aktualisiert" value={formatDateTime(request.updatedAt)} />
               )}
             </View>
 
@@ -577,7 +555,7 @@ export default function RequestDetailsModal({
                       {isProcessing ? (
                         <ActivityIndicator color="white" size="small" />
                       ) : (
-                        <Text style={styles.approveButtonText}>✓ Approve Suggested Time</Text>
+                        <Text style={styles.approveButtonText}>✓ Vorgeschlagene Zeit genehmigen</Text>
                       )}
                     </TouchableOpacity>
 
@@ -589,7 +567,7 @@ export default function RequestDetailsModal({
                       disabled={isProcessing}
                       style={[styles.editButton, isProcessing && { opacity: 0.6 }]}
                     >
-                      <Text style={styles.editButtonText}>✎ Edit & Reschedule</Text>
+                      <Text style={styles.editButtonText}>✎ Bearbeiten & Umplanen</Text>
                     </TouchableOpacity>
 
                     <TouchableOpacity
@@ -597,7 +575,7 @@ export default function RequestDetailsModal({
                       disabled={isProcessing}
                       style={[styles.rejectButton, isProcessing && { opacity: 0.6 }]}
                     >
-                      <Text style={styles.rejectButtonText}>✕ Reject Request</Text>
+                      <Text style={styles.rejectButtonText}>✕ Anfrage ablehnen</Text>
                     </TouchableOpacity>
                   </>
                 ) : (
@@ -611,7 +589,7 @@ export default function RequestDetailsModal({
                       {isProcessing ? (
                         <ActivityIndicator color="white" size="small" />
                       ) : (
-                        <Text style={styles.approveButtonText}>✓ Approve & Cancel Appointment</Text>
+                        <Text style={styles.approveButtonText}>✓ Genehmigen & Termin absagen</Text>
                       )}
                     </TouchableOpacity>
 
@@ -620,7 +598,7 @@ export default function RequestDetailsModal({
                       disabled={isProcessing}
                       style={[styles.rejectButton, isProcessing && { opacity: 0.6 }]}
                     >
-                      <Text style={styles.rejectButtonText}>✕ Reject Request</Text>
+                      <Text style={styles.rejectButtonText}>✕ Anfrage ablehnen</Text>
                     </TouchableOpacity>
                   </>
                 )}
@@ -632,7 +610,7 @@ export default function RequestDetailsModal({
           {!isPending && (
             <View style={{ marginTop: 16 }}>
               <TouchableOpacity onPress={onClose} style={styles.closeModalButton}>
-                <Text style={styles.closeModalButtonText}>Close</Text>
+                <Text style={styles.closeModalButtonText}>{de.actions.close}</Text>
               </TouchableOpacity>
             </View>
           )}
@@ -657,12 +635,12 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(0,0,0,0.5)",
     justifyContent: "center",
     alignItems: "center",
-    padding: 20,
+    padding: SPACING.lg,
   },
   modalCard: {
     backgroundColor: COLORS.card,
-    borderRadius: 16,
-    padding: 20,
+    borderRadius: BORDER_RADIUS.lg,
+    padding: SPACING.lg,
     width: "100%",
     maxWidth: 500,
     maxHeight: "90%",
@@ -676,7 +654,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: 16,
+    marginBottom: SPACING.lg,
   },
   modalTitle: {
     fontSize: 20,
@@ -685,37 +663,37 @@ const styles = StyleSheet.create({
   },
   closeButton: {
     fontSize: 24,
-    color: COLORS.dim,
+    color: COLORS.textSecondary,
     fontWeight: "800",
   },
   requestTypeBadge: {
-    backgroundColor: COLORS.blue + "20",
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 8,
+    backgroundColor: COLORS.info + "20",
+    paddingHorizontal: SPACING.lg,
+    paddingVertical: SPACING.sm,
+    borderRadius: BORDER_RADIUS.sm,
     alignSelf: "flex-start",
-    marginBottom: 16,
+    marginBottom: SPACING.lg,
   },
   requestTypeBadgeText: {
     fontSize: 14,
     fontWeight: "700",
-    color: COLORS.blue,
+    color: COLORS.info,
   },
   statusSection: {
-    marginBottom: 16,
+    marginBottom: SPACING.lg,
   },
   sectionLabel: {
     fontSize: 12,
     fontWeight: "700",
-    color: COLORS.dim,
+    color: COLORS.textSecondary,
     textTransform: "uppercase",
     letterSpacing: 0.5,
-    marginBottom: 8,
+    marginBottom: SPACING.sm,
   },
   statusBadgeLarge: {
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 8,
+    paddingHorizontal: SPACING.lg,
+    paddingVertical: SPACING.sm,
+    borderRadius: BORDER_RADIUS.sm,
     alignSelf: "flex-start",
   },
   statusBadgeLargeText: {
@@ -724,19 +702,19 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
   },
   section: {
-    marginBottom: 16,
-    paddingBottom: 16,
+    marginBottom: SPACING.lg,
+    paddingBottom: SPACING.lg,
     borderBottomWidth: 1,
-    borderBottomColor: COLORS.line,
+    borderBottomColor: COLORS.border,
   },
   detailRow: {
     flexDirection: "row",
-    marginBottom: 8,
+    marginBottom: SPACING.sm,
   },
   detailLabel: {
     fontSize: 14,
     fontWeight: "600",
-    color: COLORS.dim,
+    color: COLORS.textSecondary,
     width: 120,
   },
   detailValue: {
@@ -745,18 +723,18 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   suggestionBox: {
-    backgroundColor: "#F0F9FF",
-    padding: 12,
-    borderRadius: 8,
+    backgroundColor: COLORS.infoLight,
+    padding: SPACING.md,
+    borderRadius: BORDER_RADIUS.sm,
     borderLeftWidth: 3,
-    borderLeftColor: COLORS.blue,
+    borderLeftColor: COLORS.info,
   },
   noteBox: {
-    backgroundColor: COLORS.bg,
-    padding: 12,
-    borderRadius: 8,
+    backgroundColor: COLORS.backgroundGray,
+    padding: SPACING.md,
+    borderRadius: BORDER_RADIUS.sm,
     borderWidth: 1,
-    borderColor: COLORS.line,
+    borderColor: COLORS.border,
   },
   noteText: {
     fontSize: 14,
@@ -764,46 +742,46 @@ const styles = StyleSheet.create({
     lineHeight: 20,
   },
   actionSection: {
-    marginTop: 8,
-    gap: 10,
+    marginTop: SPACING.sm,
+    gap: SPACING.sm,
   },
   approveButton: {
-    backgroundColor: COLORS.green,
-    paddingVertical: 14,
-    borderRadius: 10,
+    backgroundColor: COLORS.success,
+    paddingVertical: SPACING.md,
+    borderRadius: BORDER_RADIUS.md,
     alignItems: "center",
   },
   approveButtonText: {
-    color: "white",
+    color: COLORS.background,
     fontSize: 16,
     fontWeight: "700",
   },
   editButton: {
-    backgroundColor: COLORS.blue,
-    paddingVertical: 14,
-    borderRadius: 10,
+    backgroundColor: COLORS.info,
+    paddingVertical: SPACING.md,
+    borderRadius: BORDER_RADIUS.md,
     alignItems: "center",
   },
   editButtonText: {
-    color: "white",
+    color: COLORS.background,
     fontSize: 16,
     fontWeight: "700",
   },
   rejectButton: {
-    backgroundColor: COLORS.red,
-    paddingVertical: 14,
-    borderRadius: 10,
+    backgroundColor: COLORS.error,
+    paddingVertical: SPACING.md,
+    borderRadius: BORDER_RADIUS.md,
     alignItems: "center",
   },
   rejectButtonText: {
-    color: "white",
+    color: COLORS.background,
     fontSize: 16,
     fontWeight: "700",
   },
   closeModalButton: {
-    backgroundColor: COLORS.bg,
-    paddingVertical: 12,
-    borderRadius: 10,
+    backgroundColor: COLORS.backgroundGray,
+    paddingVertical: SPACING.md,
+    borderRadius: BORDER_RADIUS.md,
     alignItems: "center",
   },
   closeModalButtonText: {

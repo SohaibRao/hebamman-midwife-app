@@ -13,31 +13,8 @@ import {
 import { api } from "@/lib/api";
 import { useMidwifeProfile } from "@/hooks/useMidwifeProfile";
 import { useAuth } from "@/context/AuthContext";
-
-const COLORS = {
-  bg: "#F6F8F7",
-  card: "#FFFFFF",
-  text: "#1D1D1F",
-  dim: "#5C6B63",
-  accent: "#2E5A49",
-  sage: "#7F9086",
-  green: "#22C55E",
-  blue: "#3B82F6",
-  line: "#E5E7EB",
-};
-
-const SERVICE_NAMES: Record<string, string> = {
-  "A1": "Initial Consultation A1",
-  "A1/A2": "Initial Consultation",
-  "B1": "Pre Birth Visit",
-  "B2": "Pre Birth Video",
-  "E1": "Birth Training",
-  "C1": "Early Care Visit",
-  "C2": "Early Care Video",
-  "D1": "Late Care Visit",
-  "D2": "Late Care Video",
-  "F1": "After Birth Gym",
-};
+import { COLORS, SPACING, BORDER_RADIUS } from "@/constants/theme";
+import de from "@/constants/i18n";
 
 type Request = {
   _id: string;
@@ -82,7 +59,7 @@ const sameDay = (a: Date, b: Date) =>
   a.getDate() === b.getDate();
 
 const weekdayName = (d: Date) => {
-  const days = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+  const days = ["Sonntag", "Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag"];
   return days[d.getDay()];
 };
 
@@ -266,17 +243,17 @@ export default function RescheduleApprovalModal({
   // Handle reschedule submission
   const handleReschedule = async () => {
     if (!request || !selectedDate || !selectedSlot) {
-      Alert.alert("Error", "Please select a date and time slot");
+      Alert.alert("Fehler", "Bitte wählen Sie ein Datum und einen Zeitslot");
       return;
     }
 
     Alert.alert(
-      "Confirm Reschedule",
-      `Reschedule appointment to ${toDMY(selectedDate)} at ${selectedSlot.startTime}-${selectedSlot.endTime}?`,
+      "Umplanung bestätigen",
+      `Termin auf ${toDMY(selectedDate)} um ${selectedSlot.startTime}-${selectedSlot.endTime} umplanen?`,
       [
-        { text: "Cancel", style: "cancel" },
+        { text: "Abbrechen", style: "cancel" },
         {
-          text: "Confirm",
+          text: "Bestätigen",
           onPress: async () => {
             setIsSubmitting(true);
 
@@ -323,11 +300,11 @@ export default function RescheduleApprovalModal({
                 throw new Error(statusResult.message || "Failed to update request status");
               }
 
-              Alert.alert("Success", "Appointment rescheduled successfully!");
+              Alert.alert("Erfolgreich", "Termin erfolgreich umgeplant!");
               onSuccess();
             } catch (error: any) {
               console.error("Error rescheduling:", error);
-              Alert.alert("Error", error.message || "Failed to reschedule appointment");
+              Alert.alert("Fehler", error.message || "Termin konnte nicht umgeplant werden");
             } finally {
               setIsSubmitting(false);
             }
@@ -345,7 +322,7 @@ export default function RescheduleApprovalModal({
         <View style={styles.modalCard}>
           <View style={styles.modalHeader}>
             <Text style={styles.modalTitle}>
-              Edit & Reschedule {request.serviceCode}
+              Bearbeiten & Umplanen {request.serviceCode}
             </Text>
             <TouchableOpacity onPress={onClose} disabled={isSubmitting}>
               <Text style={styles.closeButton}>✕</Text>
@@ -353,20 +330,20 @@ export default function RescheduleApprovalModal({
           </View>
 
           {!timetable ? (
-            <Text style={styles.errorText}>No timetable found</Text>
+            <Text style={styles.errorText}>Kein Zeitplan gefunden</Text>
           ) : (
             <ScrollView showsVerticalScrollIndicator={false} style={styles.scrollView}>
               {/* Service Info */}
               <View style={styles.infoBox}>
                 <Text style={styles.infoText}>
-                  Service: {SERVICE_NAMES[request.serviceCode] || request.serviceCode}
+                  Service: {de.serviceCodes[request.serviceCode as keyof typeof de.serviceCodes] || request.serviceCode}
                 </Text>
               </View>
 
               {/* Suggested Time (if available) */}
               {request.suggestedDate && (
                 <View style={styles.suggestionBox}>
-                  <Text style={styles.suggestionLabel}>Patient's Suggestion:</Text>
+                  <Text style={styles.suggestionLabel}>Vorschlag der Patientin:</Text>
                   <Text style={styles.suggestionText}>
                     {request.suggestedDate} • {request.suggestedStartTime}-{request.suggestedEndTime}
                   </Text>
@@ -386,7 +363,7 @@ export default function RescheduleApprovalModal({
                   <Text style={styles.navButtonText}>◀</Text>
                 </TouchableOpacity>
                 <Text style={styles.monthTitle}>
-                  {calendarMonth.toLocaleDateString(undefined, {
+                  {calendarMonth.toLocaleDateString('de-DE', {
                     month: "long",
                     year: "numeric",
                   })}
@@ -404,7 +381,7 @@ export default function RescheduleApprovalModal({
 
               {/* Week Header */}
               <View style={styles.weekHeader}>
-                {["S", "M", "T", "W", "T", "F", "S"].map((d, i) => (
+                {["So", "Mo", "Di", "Mi", "Do", "Fr", "Sa"].map((d, i) => (
                   <Text key={i} style={styles.weekHeaderText}>
                     {d}
                   </Text>
@@ -423,13 +400,13 @@ export default function RescheduleApprovalModal({
               {selectedDate && (
                 <View style={styles.slotsSection}>
                   <Text style={styles.slotsTitle}>
-                    Available slots on {toDMY(selectedDate)}
+                    Verfügbare Slots am {toDMY(selectedDate)}
                   </Text>
 
                   {loadingSlots ? (
-                    <ActivityIndicator color={COLORS.accent} style={{ marginVertical: 20 }} />
+                    <ActivityIndicator color={COLORS.primary} style={{ marginVertical: 20 }} />
                   ) : availableSlots.length === 0 ? (
-                    <Text style={styles.helperText}>No available slots on this date</Text>
+                    <Text style={styles.helperText}>Keine freien Slots an diesem Datum</Text>
                   ) : (
                     <View style={styles.slotsList}>
                       {availableSlots.map((slot, idx) => {
@@ -461,7 +438,7 @@ export default function RescheduleApprovalModal({
                   disabled={isSubmitting}
                   style={styles.cancelButton}
                 >
-                  <Text style={styles.cancelButtonText}>Cancel</Text>
+                  <Text style={styles.cancelButtonText}>{de.actions.cancel}</Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity
@@ -475,7 +452,7 @@ export default function RescheduleApprovalModal({
                   {isSubmitting ? (
                     <ActivityIndicator color="white" size="small" />
                   ) : (
-                    <Text style={styles.rescheduleButtonText}>Reschedule</Text>
+                    <Text style={styles.rescheduleButtonText}>Umplanen</Text>
                   )}
                 </TouchableOpacity>
               </View>
@@ -545,12 +522,12 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(0,0,0,0.5)",
     justifyContent: "center",
     alignItems: "center",
-    padding: 20,
+    padding: SPACING.lg,
   },
   modalCard: {
     backgroundColor: COLORS.card,
-    borderRadius: 16,
-    padding: 20,
+    borderRadius: BORDER_RADIUS.lg,
+    padding: SPACING.lg,
     width: "100%",
     maxWidth: 450,
     maxHeight: "90%",
@@ -564,7 +541,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: 16,
+    marginBottom: SPACING.lg,
   },
   modalTitle: {
     fontSize: 18,
@@ -573,21 +550,21 @@ const styles = StyleSheet.create({
   },
   closeButton: {
     fontSize: 24,
-    color: COLORS.dim,
+    color: COLORS.textSecondary,
     fontWeight: "800",
   },
   errorText: {
-    color: "crimson",
-    padding: 12,
+    color: COLORS.error,
+    padding: SPACING.md,
   },
   scrollView: {
     maxHeight: 600,
   },
   infoBox: {
-    backgroundColor: COLORS.bg,
-    padding: 12,
-    borderRadius: 8,
-    marginBottom: 12,
+    backgroundColor: COLORS.backgroundGray,
+    padding: SPACING.md,
+    borderRadius: BORDER_RADIUS.sm,
+    marginBottom: SPACING.md,
   },
   infoText: {
     fontSize: 14,
@@ -595,18 +572,18 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
   suggestionBox: {
-    backgroundColor: "#F0F9FF",
-    padding: 12,
-    borderRadius: 8,
+    backgroundColor: COLORS.infoLight,
+    padding: SPACING.md,
+    borderRadius: BORDER_RADIUS.sm,
     borderLeftWidth: 3,
-    borderLeftColor: COLORS.blue,
-    marginBottom: 16,
+    borderLeftColor: COLORS.info,
+    marginBottom: SPACING.lg,
   },
   suggestionLabel: {
     fontSize: 12,
     fontWeight: "700",
-    color: COLORS.dim,
-    marginBottom: 4,
+    color: COLORS.textSecondary,
+    marginBottom: SPACING.xs,
   },
   suggestionText: {
     fontSize: 14,
@@ -617,14 +594,14 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingVertical: 10,
-    marginBottom: 8,
+    paddingVertical: SPACING.sm,
+    marginBottom: SPACING.sm,
   },
   navButton: {
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 8,
-    backgroundColor: "#EEF3F1",
+    paddingHorizontal: SPACING.sm,
+    paddingVertical: SPACING.xs,
+    borderRadius: BORDER_RADIUS.sm,
+    backgroundColor: COLORS.backgroundGray,
   },
   navButtonText: {
     color: COLORS.text,
@@ -637,10 +614,10 @@ const styles = StyleSheet.create({
   },
   weekHeader: {
     flexDirection: "row",
-    paddingBottom: 6,
+    paddingBottom: SPACING.xs,
   },
   weekHeaderText: {
-    color: COLORS.dim,
+    color: COLORS.textSecondary,
     fontWeight: "700",
     textAlign: "center",
     width: "14.28%",
@@ -649,14 +626,14 @@ const styles = StyleSheet.create({
   grid: {
     flexDirection: "row",
     flexWrap: "wrap",
-    paddingBottom: 10,
+    paddingBottom: SPACING.sm,
   },
   gridCell: {
     width: "14.28%",
     aspectRatio: 1,
-    borderRadius: 8,
-    backgroundColor: "#F4F6F5",
-    padding: 4,
+    borderRadius: BORDER_RADIUS.sm,
+    backgroundColor: COLORS.backgroundGray,
+    padding: SPACING.xs,
     justifyContent: "center",
     alignItems: "center",
     marginBottom: 2,
@@ -665,7 +642,7 @@ const styles = StyleSheet.create({
     opacity: 0.3,
   },
   gridCellSelected: {
-    backgroundColor: COLORS.accent,
+    backgroundColor: COLORS.primary,
   },
   gridDay: {
     fontWeight: "800",
@@ -673,38 +650,38 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
   gridDaySelected: {
-    color: "white",
+    color: COLORS.background,
     fontWeight: "800",
   },
   slotsSection: {
-    marginTop: 16,
-    paddingBottom: 12,
+    marginTop: SPACING.lg,
+    paddingBottom: SPACING.md,
   },
   slotsTitle: {
     fontSize: 16,
     fontWeight: "800",
     color: COLORS.text,
-    marginBottom: 10,
+    marginBottom: SPACING.sm,
   },
   helperText: {
-    color: COLORS.dim,
+    color: COLORS.textSecondary,
     fontSize: 13,
   },
   slotsList: {
-    gap: 8,
+    gap: SPACING.sm,
   },
   slotCard: {
-    backgroundColor: "#F4F6F5",
-    borderRadius: 10,
+    backgroundColor: COLORS.backgroundGray,
+    borderRadius: BORDER_RADIUS.md,
     borderWidth: 1,
-    borderColor: COLORS.line,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
+    borderColor: COLORS.border,
+    paddingVertical: SPACING.md,
+    paddingHorizontal: SPACING.lg,
     alignItems: "center",
   },
   slotCardActive: {
-    backgroundColor: COLORS.accent,
-    borderColor: COLORS.accent,
+    backgroundColor: COLORS.primary,
+    borderColor: COLORS.primary,
   },
   slotText: {
     color: COLORS.text,
@@ -712,34 +689,34 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
   slotTextActive: {
-    color: "white",
+    color: COLORS.background,
   },
   buttonRow: {
     flexDirection: "row",
-    gap: 10,
-    marginTop: 16,
+    gap: SPACING.sm,
+    marginTop: SPACING.lg,
   },
   cancelButton: {
     flex: 1,
     borderWidth: 1,
-    borderColor: COLORS.accent,
-    paddingVertical: 12,
-    borderRadius: 10,
+    borderColor: COLORS.primary,
+    paddingVertical: SPACING.md,
+    borderRadius: BORDER_RADIUS.md,
     alignItems: "center",
   },
   cancelButtonText: {
-    color: COLORS.accent,
+    color: COLORS.primary,
     fontWeight: "800",
   },
   rescheduleButton: {
     flex: 1,
-    backgroundColor: COLORS.green,
-    paddingVertical: 12,
-    borderRadius: 10,
+    backgroundColor: COLORS.success,
+    paddingVertical: SPACING.md,
+    borderRadius: BORDER_RADIUS.md,
     alignItems: "center",
   },
   rescheduleButtonText: {
-    color: "white",
+    color: COLORS.background,
     fontSize: 15,
     fontWeight: "800",
   },

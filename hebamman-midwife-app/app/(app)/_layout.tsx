@@ -3,16 +3,8 @@ import { useAuth } from "@/context/AuthContext";
 import { Redirect, useRouter } from "expo-router";
 import { TouchableOpacity, Text, View, StyleSheet, Modal, ScrollView } from "react-native";
 import { useState } from "react";
-
-const COLORS = {
-  bg: "#F6F8F7",
-  card: "#FFFFFF",
-  text: "#1D1D1F",
-  dim: "#5C6B63",
-  accent: "#2E5A49",
-  sage: "#7F9086",
-  line: "#E5E7EB",
-};
+import { COLORS } from "@/constants/theme";
+import de from "@/constants/i18n";
 
 function MenuButton() {
   const [visible, setVisible] = useState(false);
@@ -49,23 +41,23 @@ function MenuButton() {
             </View>
 
             <ScrollView style={styles.menuItems}>
-              <MenuItem icon="🏠" label="Dashboard" onPress={() => navigateTo("/dashboard")} />
-              <MenuItem icon="👥" label="All Leads" onPress={() => navigateTo("/(app)/leads")} />
-              <MenuItem icon="📅" label="Appointments" onPress={() => navigateTo("/(app)/appointments")} />
-               <MenuItem icon="⏳" label="Patients Requests" onPress={() => navigateTo("/(app)/requests")} />
-              <MenuItem icon="🏥" label="Patients" onPress={() => navigateTo("/(app)/patients")} />
-              <MenuItem icon="👤" label="My Profile" onPress={() => navigateTo("/(app)/profile")} />
+              <MenuItem icon="🏠" label={de.nav.overview} onPress={() => navigateTo("/dashboard")} />
+              <MenuItem icon="👥" label="Leads" onPress={() => navigateTo("/(app)/leads")} />
+              <MenuItem icon="📅" label={de.nav.appointments} onPress={() => navigateTo("/(app)/appointments")} />
+              <MenuItem icon="📋" label={de.nav.requests} onPress={() => navigateTo("/(app)/requests")} />
+              <MenuItem icon="👥" label={de.nav.patients} onPress={() => navigateTo("/(app)/patients")} />
+              <MenuItem icon="👤" label={de.nav.profile} onPress={() => navigateTo("/(app)/profile")} />
             </ScrollView>
 
             {/* Logout */}
-            <TouchableOpacity 
-              style={styles.logoutBtn} 
+            <TouchableOpacity
+              style={styles.logoutBtn}
               onPress={() => {
                 setVisible(false);
                 logout();
               }}
             >
-              <Text style={styles.logoutText}>🚪 Logout</Text>
+              <Text style={styles.logoutText}>🚪 {de.nav.logout}</Text>
             </TouchableOpacity>
           </TouchableOpacity>
         </TouchableOpacity>
@@ -93,39 +85,39 @@ export default function AppLayout() {
   return (
     <Stack
       screenOptions={{
-        headerStyle: { backgroundColor: COLORS.accent },
+        headerStyle: { backgroundColor: COLORS.primary },
         headerTintColor: "white",
         headerTitleStyle: { fontWeight: "700" },
         headerLeft: () => <MenuButton />,
       }}
     >
-      <Stack.Screen 
-        name="dashboard" 
-        options={{ title: "Dashboard" }} 
+      <Stack.Screen
+        name="dashboard"
+        options={{ title: de.appName }}
       />
-      <Stack.Screen 
-        name="leads/index" 
-        options={{ title: "Leads" }} 
+      <Stack.Screen
+        name="leads/index"
+        options={{ title: "Leads" }}
       />
-      <Stack.Screen 
-        name="appointments/index" 
-        options={{ title: "Appointments" }} 
+      <Stack.Screen
+        name="appointments/index"
+        options={{ title: de.appointments.title }}
       />
-      <Stack.Screen 
-        name="patients/index" 
-        options={{ title: "Patients" }} 
+      <Stack.Screen
+        name="patients/index"
+        options={{ title: de.patients.title }}
       />
-      <Stack.Screen 
-        name="patients/[patientId]/appointments" 
-        options={{ title: "Patient Appointments" }} 
+      <Stack.Screen
+        name="patients/[patientId]/appointments"
+        options={{ title: de.appointments.title }}
       />
-      <Stack.Screen 
-        name="profile/index" 
-        options={{ title: "Profile" }} 
+      <Stack.Screen
+        name="profile/index"
+        options={{ title: de.profile.title }}
       />
-      <Stack.Screen 
-        name="requests/index" 
-        options={{ title: "Requests" }} 
+      <Stack.Screen
+        name="requests/index"
+        options={{ title: de.requests.title }}
       />
     </Stack>
   );
@@ -134,7 +126,7 @@ export default function AppLayout() {
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
-    backgroundColor: "rgba(0,0,0,0.5)",
+    backgroundColor: COLORS.overlay,
     justifyContent: "flex-end",
   },
   menuContainer: {
@@ -145,7 +137,7 @@ const styles = StyleSheet.create({
     paddingBottom: 20,
   },
   menuHeader: {
-    backgroundColor: COLORS.accent,
+    backgroundColor: COLORS.primary,
     padding: 20,
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
@@ -163,7 +155,7 @@ const styles = StyleSheet.create({
   avatarText: {
     fontSize: 28,
     fontWeight: "800",
-    color: COLORS.accent,
+    color: COLORS.primary,
   },
   userName: {
     fontSize: 20,
@@ -196,7 +188,7 @@ const styles = StyleSheet.create({
     color: COLORS.text,
   },
   logoutBtn: {
-    backgroundColor: COLORS.accent,
+    backgroundColor: COLORS.primary,
     marginHorizontal: 16,
     paddingVertical: 14,
     borderRadius: 12,

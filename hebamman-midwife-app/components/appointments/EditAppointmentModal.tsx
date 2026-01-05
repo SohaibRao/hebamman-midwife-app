@@ -10,15 +10,8 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-
-const COLORS = {
-  bg: "#F6F8F7",
-  card: "#FFFFFF",
-  text: "#1D1D1F",
-  dim: "#5C6B63",
-  accent: "#2E5A49",
-  line: "#E5E7EB",
-};
+import { COLORS, SPACING, BORDER_RADIUS } from "@/constants/theme";
+import de from "@/constants/i18n";
 
 type UiApt = {
   serviceCode: string;
@@ -73,7 +66,7 @@ const sameDay = (a: Date, b: Date) =>
   a.getMonth() === b.getMonth() &&
   a.getDate() === b.getDate();
 const fmtDateShort = (d: Date) =>
-  d.toLocaleDateString(undefined, { weekday: "short", day: "2-digit", month: "short" });
+  d.toLocaleDateString('de-DE', { weekday: "short", day: "2-digit", month: "short" });
 
 export default function EditAppointmentModal({
   visible,
@@ -109,14 +102,14 @@ export default function EditAppointmentModal({
       <View style={styles.overlay}>
         <View style={styles.modalCard}>
           <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>Reschedule {appointment.serviceCode}</Text>
+            <Text style={styles.modalTitle}>{de.appointments.editAppointment} {appointment.serviceCode}</Text>
             <TouchableOpacity onPress={onClose}>
               <Text style={styles.closeButton}>✕</Text>
             </TouchableOpacity>
           </View>
 
           {!timetable ? (
-            <Text style={styles.errorText}>No timetable found for this midwife.</Text>
+            <Text style={styles.errorText}>Kein Zeitplan für diese Hebamme gefunden.</Text>
           ) : (
             <ScrollView showsVerticalScrollIndicator={false} style={styles.scrollView}>
               {/* Month Navigation */}
@@ -132,7 +125,7 @@ export default function EditAppointmentModal({
                   <Text style={styles.navButtonText}>◀</Text>
                 </TouchableOpacity>
                 <Text style={styles.monthTitle}>
-                  {calendarMonth.toLocaleDateString(undefined, {
+                  {calendarMonth.toLocaleDateString('de-DE', {
                     month: "long",
                     year: "numeric",
                   })}
@@ -151,7 +144,7 @@ export default function EditAppointmentModal({
 
               {/* Week Header */}
               <View style={styles.weekHeader}>
-                {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((d) => (
+                {["So", "Mo", "Di", "Mi", "Do", "Fr", "Sa"].map((d) => (
                   <Text key={d} style={styles.weekHeaderText}>
                     {d}
                   </Text>
@@ -169,12 +162,12 @@ export default function EditAppointmentModal({
               {/* Available Slots */}
               <View style={styles.slotsSection}>
                 <Text style={styles.slotsTitle}>
-                  {selectedDate ? `Slots on ${fmtDateShort(selectedDate)}` : "Select a date"}
+                  {selectedDate ? `Slots am ${fmtDateShort(selectedDate)}` : "Wählen Sie ein Datum"}
                 </Text>
                 {!selectedDate ? (
-                  <Text style={styles.helperText}>Pick a date to see available slots.</Text>
+                  <Text style={styles.helperText}>Wählen Sie ein Datum, um verfügbare Slots anzuzeigen.</Text>
                 ) : availableSlots.length === 0 ? (
-                  <Text style={styles.helperText}>No free slots on this date.</Text>
+                  <Text style={styles.helperText}>Keine freien Slots an diesem Datum.</Text>
                 ) : (
                   <View style={styles.slotsList}>
                     {availableSlots.map((s) => {
@@ -215,7 +208,7 @@ export default function EditAppointmentModal({
 
               {/* Cancel Appointment Button */}
               <TouchableOpacity onPress={onCancelAppointment} style={styles.cancelButton}>
-                <Text style={styles.cancelButtonText}>Cancel Appointment</Text>
+                <Text style={styles.cancelButtonText}>{de.appointments.cancelAppointment}</Text>
               </TouchableOpacity>
 
               {/* Save Changes Button */}
@@ -228,7 +221,7 @@ export default function EditAppointmentModal({
                 ]}
               >
                 <Text style={styles.saveButtonText}>
-                  {submitting ? "Saving…" : "Save Changes"}
+                  {submitting ? "Speichern…" : "Änderungen speichern"}
                 </Text>
               </TouchableOpacity>
             </ScrollView>
@@ -317,16 +310,16 @@ function CustomTimeSection({
     <View style={styles.customTimeSection}>
       <TouchableOpacity onPress={onToggle} style={styles.customTimeToggle}>
         <Text style={styles.customTimeToggleText}>
-          {show ? "− Hide" : "+ Book"} custom time slot
+          {show ? "− Ausblenden" : "+ Buchen"} benutzerdefinierter Zeitslot
         </Text>
       </TouchableOpacity>
 
       {show && (
         <View style={styles.customTimeContainer}>
-          <Text style={styles.customTimeTitle}>Custom Time Slot</Text>
+          <Text style={styles.customTimeTitle}>Benutzerdefinierter Zeitslot</Text>
 
           <View style={styles.availableTimeBox}>
-            <Text style={styles.availableTimeLabel}>Available Time Today:</Text>
+            <Text style={styles.availableTimeLabel}>Verfügbare Zeit heute:</Text>
             {availableTimeRanges.map((range, idx) => (
               <Text key={idx} style={styles.availableTimeText}>
                 {range}
@@ -335,12 +328,12 @@ function CustomTimeSection({
           </View>
 
           <View style={styles.timeInputSection}>
-            <Text style={styles.inputLabel}>Start Time</Text>
+            <Text style={styles.inputLabel}>Startzeit</Text>
             <View style={styles.timePickerContainer}>
               <ScrollView style={styles.timePicker} nestedScrollEnabled>
                 {filterTimeOptions(availableTimeRanges).length === 0 ? (
                   <View style={styles.emptyTimePicker}>
-                    <Text style={styles.emptyTimeText}>No available time slots</Text>
+                    <Text style={styles.emptyTimeText}>Keine verfügbaren Zeitslots</Text>
                   </View>
                 ) : (
                   filterTimeOptions(availableTimeRanges).map((time) => (
@@ -368,17 +361,17 @@ function CustomTimeSection({
           </View>
 
           <View style={styles.timeInputSection}>
-            <Text style={styles.inputLabel}>End Time (Auto-calculated)</Text>
+            <Text style={styles.inputLabel}>Endzeit (Automatisch berechnet)</Text>
             <View style={styles.disabledInput}>
               <Text style={styles.disabledInputText}>
-                {customEndTime || "Will be calculated automatically"}
+                {customEndTime || "Wird automatisch berechnet"}
               </Text>
             </View>
           </View>
 
           {customStartTime && customEndTime && (
             <Text style={styles.durationText}>
-              Duration: {getServiceDuration(serviceCode)} minutes
+              Dauer: {getServiceDuration(serviceCode)} Minuten
             </Text>
           )}
         </View>
@@ -393,12 +386,12 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(0,0,0,.25)",
     alignItems: "center",
     justifyContent: "center",
-    padding: 20,
+    padding: SPACING.lg,
   },
   modalCard: {
     backgroundColor: COLORS.card,
-    borderRadius: 12,
-    padding: 18,
+    borderRadius: BORDER_RADIUS.lg,
+    padding: SPACING.lg,
     width: "100%",
     maxWidth: 400,
     maxHeight: "90%",
@@ -412,7 +405,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: 12,
+    marginBottom: SPACING.md,
   },
   modalTitle: {
     fontSize: 18,
@@ -421,12 +414,12 @@ const styles = StyleSheet.create({
   },
   closeButton: {
     fontWeight: "800",
-    color: COLORS.dim,
+    color: COLORS.textSecondary,
     fontSize: 20,
   },
   errorText: {
-    color: "crimson",
-    padding: 12,
+    color: COLORS.error,
+    padding: SPACING.md,
   },
   scrollView: {
     maxHeight: 600,
@@ -435,14 +428,14 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingVertical: 10,
-    marginBottom: 8,
+    paddingVertical: SPACING.sm,
+    marginBottom: SPACING.sm,
   },
   navButton: {
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 8,
-    backgroundColor: "#EEF3F1",
+    paddingHorizontal: SPACING.sm,
+    paddingVertical: SPACING.xs,
+    borderRadius: BORDER_RADIUS.sm,
+    backgroundColor: COLORS.backgroundGray,
   },
   navButtonText: {
     color: COLORS.text,
@@ -455,10 +448,10 @@ const styles = StyleSheet.create({
   },
   weekHeader: {
     flexDirection: "row",
-    paddingBottom: 6,
+    paddingBottom: SPACING.xs,
   },
   weekHeaderText: {
-    color: COLORS.dim,
+    color: COLORS.textSecondary,
     fontWeight: "700",
     textAlign: "center",
     width: "14.28%",
@@ -467,14 +460,14 @@ const styles = StyleSheet.create({
   grid: {
     flexDirection: "row",
     flexWrap: "wrap",
-    paddingBottom: 10,
+    paddingBottom: SPACING.sm,
   },
   gridCell: {
     width: "14.28%",
     aspectRatio: 1,
-    borderRadius: 8,
-    backgroundColor: "#F4F6F5",
-    padding: 4,
+    borderRadius: BORDER_RADIUS.sm,
+    backgroundColor: COLORS.backgroundGray,
+    padding: SPACING.xs,
     justifyContent: "center",
     alignItems: "center",
     marginBottom: 2,
@@ -483,7 +476,7 @@ const styles = StyleSheet.create({
     opacity: 0.3,
   },
   gridCellSelected: {
-    backgroundColor: "#E7ECEA",
+    backgroundColor: COLORS.primaryLight,
   },
   gridDay: {
     fontWeight: "800",
@@ -494,34 +487,34 @@ const styles = StyleSheet.create({
     fontWeight: "800",
   },
   slotsSection: {
-    marginTop: 16,
-    paddingBottom: 12,
+    marginTop: SPACING.lg,
+    paddingBottom: SPACING.md,
   },
   slotsTitle: {
     fontSize: 16,
     fontWeight: "800",
     color: COLORS.text,
-    marginBottom: 10,
+    marginBottom: SPACING.sm,
   },
   helperText: {
-    color: COLORS.dim,
+    color: COLORS.textSecondary,
     fontSize: 13,
   },
   slotsList: {
-    gap: 8,
+    gap: SPACING.sm,
   },
   slotCard: {
-    backgroundColor: "#F4F6F5",
-    borderRadius: 10,
+    backgroundColor: COLORS.backgroundGray,
+    borderRadius: BORDER_RADIUS.md,
     borderWidth: 1,
-    borderColor: COLORS.line,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
+    borderColor: COLORS.border,
+    paddingVertical: SPACING.md,
+    paddingHorizontal: SPACING.lg,
     alignItems: "center",
   },
   slotCardActive: {
-    backgroundColor: COLORS.accent,
-    borderColor: COLORS.accent,
+    backgroundColor: COLORS.primary,
+    borderColor: COLORS.primary,
   },
   slotText: {
     color: COLORS.text,
@@ -529,137 +522,137 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
   slotTextActive: {
-    color: "white",
+    color: COLORS.background,
   },
   customTimeSection: {
-    marginTop: 16,
-    paddingTop: 16,
+    marginTop: SPACING.lg,
+    paddingTop: SPACING.lg,
     borderTopWidth: 1,
-    borderTopColor: COLORS.line,
+    borderTopColor: COLORS.border,
   },
   customTimeToggle: {
-    paddingVertical: 8,
+    paddingVertical: SPACING.sm,
   },
   customTimeToggleText: {
-    color: COLORS.accent,
+    color: COLORS.primary,
     fontWeight: "700",
     fontSize: 14,
   },
   customTimeContainer: {
-    marginTop: 12,
-    padding: 12,
-    backgroundColor: "#F9FBFA",
-    borderRadius: 10,
+    marginTop: SPACING.md,
+    padding: SPACING.md,
+    backgroundColor: COLORS.backgroundGray,
+    borderRadius: BORDER_RADIUS.md,
     borderWidth: 1,
-    borderColor: COLORS.line,
+    borderColor: COLORS.border,
   },
   customTimeTitle: {
     fontSize: 14,
     fontWeight: "700",
     color: COLORS.text,
-    marginBottom: 12,
+    marginBottom: SPACING.md,
   },
   availableTimeBox: {
-    padding: 12,
+    padding: SPACING.md,
     backgroundColor: COLORS.card,
-    borderRadius: 8,
-    marginBottom: 12,
+    borderRadius: BORDER_RADIUS.sm,
+    marginBottom: SPACING.md,
   },
   availableTimeLabel: {
     fontSize: 12,
     fontWeight: "700",
-    color: COLORS.dim,
-    marginBottom: 8,
+    color: COLORS.textSecondary,
+    marginBottom: SPACING.sm,
   },
   availableTimeText: {
     fontSize: 12,
-    color: "#16a34a",
-    marginBottom: 4,
+    color: COLORS.success,
+    marginBottom: SPACING.xs,
   },
   timeInputSection: {
-    marginBottom: 12,
+    marginBottom: SPACING.md,
   },
   inputLabel: {
     fontSize: 12,
     fontWeight: "700",
-    color: COLORS.dim,
-    marginBottom: 6,
+    color: COLORS.textSecondary,
+    marginBottom: SPACING.xs,
   },
   timePickerContainer: {
     backgroundColor: COLORS.card,
-    borderRadius: 8,
+    borderRadius: BORDER_RADIUS.sm,
     borderWidth: 1,
-    borderColor: COLORS.line,
+    borderColor: COLORS.border,
     maxHeight: 150,
   },
   timePicker: {
     maxHeight: 150,
   },
   emptyTimePicker: {
-    padding: 12,
+    padding: SPACING.md,
   },
   emptyTimeText: {
-    color: COLORS.dim,
+    color: COLORS.textSecondary,
     textAlign: "center",
   },
   timeOption: {
-    paddingVertical: 10,
-    paddingHorizontal: 12,
+    paddingVertical: SPACING.sm,
+    paddingHorizontal: SPACING.md,
     borderBottomWidth: 1,
-    borderBottomColor: COLORS.line,
+    borderBottomColor: COLORS.border,
   },
   timeOptionSelected: {
-    backgroundColor: COLORS.accent,
+    backgroundColor: COLORS.primary,
   },
   timeOptionText: {
     fontSize: 14,
     color: COLORS.text,
   },
   timeOptionTextSelected: {
-    color: "white",
+    color: COLORS.background,
     fontWeight: "700",
   },
   disabledInput: {
-    backgroundColor: "#F4F6F5",
-    borderRadius: 8,
+    backgroundColor: COLORS.backgroundGray,
+    borderRadius: BORDER_RADIUS.sm,
     borderWidth: 1,
-    borderColor: COLORS.line,
-    paddingVertical: 10,
-    paddingHorizontal: 12,
+    borderColor: COLORS.border,
+    paddingVertical: SPACING.sm,
+    paddingHorizontal: SPACING.md,
     opacity: 0.6,
   },
   disabledInputText: {
-    color: COLORS.dim,
+    color: COLORS.textSecondary,
   },
   durationText: {
     fontSize: 12,
-    color: COLORS.dim,
-    marginTop: 8,
+    color: COLORS.textSecondary,
+    marginTop: SPACING.sm,
   },
   cancelButton: {
-    backgroundColor: "#DC2626",
-    paddingVertical: 14,
-    borderRadius: 10,
+    backgroundColor: COLORS.error,
+    paddingVertical: SPACING.md,
+    borderRadius: BORDER_RADIUS.md,
     alignItems: "center",
-    marginTop: 16,
+    marginTop: SPACING.lg,
   },
   cancelButtonText: {
-    color: "white",
+    color: COLORS.background,
     fontSize: 15,
     fontWeight: "700",
   },
   saveButton: {
-    backgroundColor: COLORS.accent,
-    paddingVertical: 14,
-    borderRadius: 10,
+    backgroundColor: COLORS.primary,
+    paddingVertical: SPACING.md,
+    borderRadius: BORDER_RADIUS.md,
     alignItems: "center",
-    marginTop: 10,
+    marginTop: SPACING.sm,
   },
   saveButtonDisabled: {
     opacity: 0.6,
   },
   saveButtonText: {
-    color: "white",
+    color: COLORS.background,
     fontSize: 15,
     fontWeight: "800",
   },

@@ -22,16 +22,8 @@ import EditAppointmentModal from "@/components/appointments/EditAppointmentModal
 import ReactivateAppointmentModal from "@/components/appointments/ReactivateAppointmentModal";
 import CalendarView from "@/components/appointments/CalendarView";
 import BulkCancelAppointments from "@/components/appointments/BulkCancelAppointments";
-
-// -------------------- Theme --------------------
-const COLORS = {
-  bg: "#F6F8F7",
-  card: "#FFFFFF",
-  text: "#1D1D1F",
-  dim: "#5C6B63",
-  accent: "#2E5A49",
-  line: "#E5E7EB",
-};
+import { COLORS, SPACING, BORDER_RADIUS, SHADOWS } from "@/constants/theme";
+import de from "@/constants/i18n";
 
 // -------------------- Types --------------------
 type MonthKey = string;
@@ -876,9 +868,9 @@ export default function AppointmentsScreen() {
   // Render
   if (pf.status === "loading" || !midwifeId) {
     return (
-      <View style={[styles.center, { flex: 1, backgroundColor: COLORS.bg }]}>
-        <ActivityIndicator />
-        <Text style={{ marginTop: 8, color: COLORS.dim }}>Loading profile…</Text>
+      <View style={[styles.center, { flex: 1, backgroundColor: COLORS.background }]}>
+        <ActivityIndicator color={COLORS.primary} />
+        <Text style={{ marginTop: SPACING.sm, color: COLORS.textSecondary }}>{de.common.loading}</Text>
       </View>
     );
   }
@@ -887,7 +879,7 @@ export default function AppointmentsScreen() {
     <View style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-        <Text style={styles.title}>Appointments</Text>
+        <Text style={styles.title}>{de.appointments.title}</Text>
 
         <View style={styles.tabsWrap}>
           <View style={styles.tabs}>
@@ -895,40 +887,42 @@ export default function AppointmentsScreen() {
               onPress={() => setTab("list")}
               style={[styles.tabBtn, tab === "list" && styles.tabActive]}
             >
-              <Text style={[styles.tabText, tab === "list" && styles.tabTextActive]}>List</Text>
+              <Text style={[styles.tabText, tab === "list" && styles.tabTextActive]}>
+                {de.appointments.listView}
+              </Text>
             </TouchableOpacity>
             <TouchableOpacity
               onPress={() => setTab("calendar")}
               style={[styles.tabBtn, tab === "calendar" && styles.tabActive]}
             >
               <Text style={[styles.tabText, tab === "calendar" && styles.tabTextActive]}>
-                Calendar
+                {de.appointments.calendarView}
               </Text>
             </TouchableOpacity>
           </View>
 
           <View style={styles.buttonRow}>
             <TouchableOpacity onPress={fetchMonthly} style={styles.reloadBtn}>
-              <Text style={styles.reloadText}>Reload</Text>
+              <Text style={styles.reloadText}>{de.actions.refresh}</Text>
             </TouchableOpacity>
             <TouchableOpacity
               onPress={() => setShowBulkCancelModal(true)}
               style={styles.bulkCancelBtn}
             >
-              <Text style={styles.bulkCancelText}>Bulk Cancel</Text>
+              <Text style={styles.bulkCancelText}>{de.appointments.bulkCancel}</Text>
             </TouchableOpacity>
           </View>
         </View>
 
         <Text style={styles.metaText}>
-          {metaInfo?.monthsFound != null ? `Months: ${metaInfo.monthsFound}` : ""}{" "}
-          {metaInfo?.totalDocs != null ? `• Total: ${metaInfo.totalDocs}` : ""}
+          {metaInfo?.monthsFound != null ? `${de.common.months}: ${metaInfo.monthsFound}` : ""}{" "}
+          {metaInfo?.totalDocs != null ? `• ${de.common.total}: ${metaInfo.totalDocs}` : ""}
         </Text>
       </View>
 
       {error && (
-        <View style={{ paddingHorizontal: 16 }}>
-          <Text style={{ color: "crimson" }}>{error}</Text>
+        <View style={{ paddingHorizontal: SPACING.lg }}>
+          <Text style={{ color: COLORS.error }}>{error}</Text>
         </View>
       )}
 
@@ -1079,54 +1073,54 @@ export default function AppointmentsScreen() {
 
 // -------------------- Styles --------------------
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: COLORS.bg },
+  container: { flex: 1, backgroundColor: COLORS.background },
   center: { alignItems: "center", justifyContent: "center" },
-  header: { paddingTop: 14, paddingHorizontal: 16, paddingBottom: 6 },
-  title: { fontSize: 22, fontWeight: "800", color: COLORS.text, marginBottom: 10 },
-  tabsWrap: { paddingHorizontal: 16, paddingBottom: 8 },
+  header: { paddingTop: SPACING.md, paddingHorizontal: SPACING.lg, paddingBottom: SPACING.sm },
+  title: { fontSize: 22, fontWeight: "800", color: COLORS.text, marginBottom: SPACING.sm },
+  tabsWrap: { paddingHorizontal: SPACING.lg, paddingBottom: SPACING.sm },
   tabs: {
-    backgroundColor: "#E7ECEA",
-    borderRadius: 12,
+    backgroundColor: COLORS.backgroundGray,
+    borderRadius: BORDER_RADIUS.md,
     flexDirection: "row",
     padding: 4,
-    gap: 6,
+    gap: SPACING.xs,
     alignSelf: "flex-start",
   },
-  tabBtn: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 8 },
+  tabBtn: { paddingHorizontal: SPACING.md, paddingVertical: SPACING.sm, borderRadius: BORDER_RADIUS.sm },
   tabActive: { backgroundColor: COLORS.card },
-  tabText: { color: COLORS.dim, fontWeight: "700" },
+  tabText: { color: COLORS.textSecondary, fontWeight: "700" },
   tabTextActive: { color: COLORS.text },
-  buttonRow: { flexDirection: "row", gap: 8 },
+  buttonRow: { flexDirection: "row", gap: SPACING.sm },
   reloadBtn: {
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 10,
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.sm,
+    borderRadius: BORDER_RADIUS.sm,
     borderWidth: 1,
-    borderColor: COLORS.accent,
+    borderColor: COLORS.primary,
     backgroundColor: "transparent",
   },
-  reloadText: { color: COLORS.accent, fontWeight: "800" },
+  reloadText: { color: COLORS.primary, fontWeight: "800" },
   bulkCancelBtn: {
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 10,
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.sm,
+    borderRadius: BORDER_RADIUS.sm,
     borderWidth: 1,
-    borderColor: "#DC2626",
+    borderColor: COLORS.error,
     backgroundColor: "transparent",
   },
-  bulkCancelText: { color: "#DC2626", fontWeight: "800" },
-  metaText: { color: COLORS.dim, fontSize: 12, fontWeight: "600" },
+  bulkCancelText: { color: COLORS.error, fontWeight: "800" },
+  metaText: { color: COLORS.textSecondary, fontSize: 12, fontWeight: "600" },
   monthNav: {
-    paddingHorizontal: 16,
-    marginBottom: 8,
+    paddingHorizontal: SPACING.lg,
+    marginBottom: SPACING.sm,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
   },
-  navBtn: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, backgroundColor: "#EEF3F1" },
+  navBtn: { paddingHorizontal: SPACING.sm, paddingVertical: SPACING.xs, borderRadius: BORDER_RADIUS.sm, backgroundColor: COLORS.backgroundGray },
   navBtnDisabled: { opacity: 0.4 },
   navBtnText: { color: COLORS.text, fontWeight: "700" },
   monthNavTitle: { fontSize: 18, fontWeight: "800", color: COLORS.text, textAlign: "center" },
-  listContent: { padding: 16, gap: 8 },
-  emptyText: { color: COLORS.dim, textAlign: "center" },
+  listContent: { padding: SPACING.lg, gap: SPACING.sm },
+  emptyText: { color: COLORS.textSecondary, textAlign: "center" },
 });

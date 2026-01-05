@@ -15,18 +15,8 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { api } from "@/lib/api";
 import { useMidwifeProfile } from "@/hooks/useMidwifeProfile";
 import { useAuth } from "@/context/AuthContext";
-
-// -------------------- Theme --------------------
-const COLORS = {
-  bg: "#F6F8F7",
-  card: "#FFFFFF",
-  text: "#1D1D1F",
-  dim: "#5C6B63",
-  accent: "#2E5A49",
-  sage: "#7F9086",
-  green: "#22C55E",
-  line: "#E5E7EB",
-};
+import { COLORS, SPACING, BORDER_RADIUS } from "@/constants/theme";
+import de from "@/constants/i18n";
 
 // -------------------- Types --------------------
 type Apt = {
@@ -58,30 +48,20 @@ type Timetable = {
 
 type Tab = "list" | "calendar";
 
-// Service colors
+// Service colors - using theme colors
 const SERVICE_COLORS: Record<string, string> = {
-  B1: "#2563eb",
-  B2: "#0ea5e9",
-  E1: "#f59e0b",
-  C1: "#16a34a",
-  C2: "#10b981",
-  D1: "#ef4444",
-  D2: "#f97316",
-  F1: "#a855f7",
+  B1: COLORS.serviceB1,
+  B2: COLORS.serviceB2,
+  E1: COLORS.serviceE1,
+  C1: COLORS.serviceC1,
+  C2: COLORS.serviceC2,
+  D1: COLORS.serviceD1,
+  D2: COLORS.serviceD2,
+  F1: COLORS.serviceF1,
 };
 
-const SERVICE_NAMES: Record<string, string> = {
-  B1: "Pre Birth Visit",
-  B2: "Pre Birth Video",
-  E1: "Birth Training",
-  C1: "Early Care Visit",
-  C2: "Early Care Video",
-  D1: "Late Care Visit",
-  D2: "Late Care Video",
-  F1: "After Birth Gym",
-};
-
-const DAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+const DAY_NAMES = ["Sonntag", "Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag"];
+const TIMETABLE_DAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
 // -------------------- Helpers --------------------
 const toDate = (dmy: string) => {
@@ -97,37 +77,38 @@ const toDMY = (d: Date) => {
 };
 
 const fmtDateShort = (d: Date) =>
-  d.toLocaleDateString(undefined, { weekday: "short", day: "2-digit", month: "short" });
+  d.toLocaleDateString('de-DE', { weekday: "short", day: "2-digit", month: "short" });
 
 const sameDay = (a: Date, b: Date) =>
   a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
 
 const monthTitle = (d: Date) =>
-  d.toLocaleDateString(undefined, { month: "long", year: "numeric" });
+  d.toLocaleDateString('de-DE', { month: "long", year: "numeric" });
 
 const weekdayName = (d: Date) => DAY_NAMES[d.getDay()];
+const weekdayNameForTimetable = (d: Date) => TIMETABLE_DAY_NAMES[d.getDay()];
 
-const codeColor = (code: string) => SERVICE_COLORS[code] ?? COLORS.sage;
+const codeColor = (code: string) => SERVICE_COLORS[code] ?? COLORS.primary;
 
 // Get status badge style
 const getStatusBadgeStyle = (status?: string) => {
   const normalizedStatus = status?.toLowerCase() || "active";
-  
+
   const styles: Record<string, any> = {
     active: {
-      backgroundColor: "#D1FAE5",
-      color: "#065F46",
+      backgroundColor: COLORS.successLight,
+      color: COLORS.successDark,
     },
     pending: {
-      backgroundColor: "#FEF3C7",
-      color: "#92400E",
+      backgroundColor: COLORS.warningLight,
+      color: COLORS.warningDark,
     },
     cancelled: {
-      backgroundColor: "#FEE2E2",
-      color: "#991B1B",
+      backgroundColor: COLORS.errorLight,
+      color: COLORS.errorDark,
     },
   };
-  
+
   return styles[normalizedStatus] || styles.active;
 };
 
@@ -213,18 +194,18 @@ export default function PatientAppointmentsScreen() {
   const [isUpdating, setIsUpdating] = useState(false);
   const [editCalendarDate, setEditCalendarDate] = useState(new Date());
 
-  // Cancel appointment states
-  const [showCancelConfirm, setShowCancelConfirm] = useState(false);
-  const [cancelingAppointment, setCancelingAppointment] = useState<Apt | null>(null);
-  const [isCanceling, setIsCanceling] = useState(false);
+  // Abbrechen appointment states
+  const [showAbbrechenConfirm, setShowAbbrechenConfirm] = useState(false);
+  const [cancelingAppointment, setAbbrecheningAppointment] = useState<Apt | null>(null);
+  const [isAbbrechening, setIsAbbrechening] = useState(false);
 
-  // Reactivate appointment states
-  const [showReactivateModal, setShowReactivateModal] = useState(false);
+  // Reaktivieren appointment states
+  const [showReaktivierenModal, setShowReaktivierenModal] = useState(false);
   const [reactivatingAppointment, setReactivatingAppointment] = useState<Apt | null>(null);
-  const [reactivateDate, setReactivateDate] = useState<Date | null>(null);
-  const [reactivateSlot, setReactivateSlot] = useState<TimeSlot | null>(null);
+  const [reactivateDate, setReaktivierenDate] = useState<Date | null>(null);
+  const [reactivateSlot, setReaktivierenSlot] = useState<TimeSlot | null>(null);
   const [isReactivating, setIsReactivating] = useState(false);
-  const [reactivateCalendarMonth, setReactivateCalendarMonth] = useState<Date>(new Date());
+  const [reactivateCalendarMonth, setReaktivierenCalendarMonth] = useState<Date>(new Date());
 
   // All appointments
   const allAppointments = useMemo(() => {
@@ -303,7 +284,7 @@ export default function PatientAppointmentsScreen() {
       setPreBirthApts(preApts);
       setPostBirthApts(postApts);
     } catch (e: any) {
-      setError(e?.message ?? "Failed to load appointments");
+      setError(e?.message ?? "Termine konnten nicht geladen werden");
     } finally {
       setLoading(false);
     }
@@ -406,7 +387,7 @@ export default function PatientAppointmentsScreen() {
   // Check if date is available based on timetable
   const isDateAvailable = useCallback((date: Date, serviceCode: string): boolean => {
     if (!timetable) return false;
-    const dayName = weekdayName(date);
+    const dayName = weekdayNameForTimetable(date);
     const daySlots = timetable[dayName];
     if (!daySlots?.slots?.[serviceCode]) return false;
     return daySlots.slots[serviceCode].length > 0;
@@ -415,7 +396,7 @@ export default function PatientAppointmentsScreen() {
   // Get available time slots for a date
   const getAvailableTimeSlots = useCallback((date: Date, serviceCode: string): TimeSlot[] => {
     if (!timetable) return [];
-    const dayName = weekdayName(date);
+    const dayName = weekdayNameForTimetable(date);
     const daySlots = timetable[dayName];
     if (!daySlots?.slots?.[serviceCode]) return [];
     
@@ -435,7 +416,7 @@ export default function PatientAppointmentsScreen() {
   const findAvailableTimeRanges = useCallback((date: Date): string[] => {
     if (!timetable) return ["00:00 - 23:59 available"];
 
-    const dayName = weekdayName(date);
+    const dayName = weekdayNameForTimetable(date);
     const daySlots = timetable[dayName];
     if (!daySlots?.slots) return ["00:00 - 23:59 available"];
 
@@ -510,13 +491,13 @@ export default function PatientAppointmentsScreen() {
     const endMinutes = parseTime(endTime);
 
     if (endMinutes <= startMinutes) {
-      Alert.alert("Error", "End time must be after start time");
+      Alert.alert("Fehler", "Endzeit muss nach der Startzeit liegen");
       return false;
     }
 
     const ranges = findAvailableTimeRanges(date);
     if (ranges[0] === "No free time available") {
-      Alert.alert("Error", "No free time available on this date");
+      Alert.alert("Fehler", "Keine freie Zeit an diesem Datum verfügbar");
       return false;
     }
 
@@ -531,7 +512,7 @@ export default function PatientAppointmentsScreen() {
       }
     }
 
-    Alert.alert("Error", "Selected time is not within available time ranges");
+    Alert.alert("Fehler", "Die ausgewählte Zeit liegt nicht innerhalb der verfügbaren Zeitbereiche");
     return false;
   };
 
@@ -633,7 +614,7 @@ export default function PatientAppointmentsScreen() {
 
   const submitEdit = async () => {
     if (!selectedEdit || !editDate) {
-      Alert.alert("Error", "Please select a date");
+      Alert.alert("Fehler", "Bitte wählen Sie ein Datum");
       return;
     }
 
@@ -642,7 +623,7 @@ export default function PatientAppointmentsScreen() {
 
     if (showEditCustomTime) {
       if (!editCustomStart || !editCustomEnd) {
-        Alert.alert("Error", "Please select start time");
+        Alert.alert("Fehler", "Bitte wählen Sie eine Startzeit");
         return;
       }
       if (!isCustomTimeValid(editCustomStart, editCustomEnd, editDate)) return;
@@ -650,7 +631,7 @@ export default function PatientAppointmentsScreen() {
       endTime = editCustomEnd;
     } else {
       if (!editTimeSlot) {
-        Alert.alert("Error", "Please select a time slot");
+        Alert.alert("Fehler", "Bitte wählen Sie einen Zeitslot");
         return;
       }
       startTime = editTimeSlot.startTime;
@@ -681,9 +662,9 @@ export default function PatientAppointmentsScreen() {
       await fetchAppointments();
       closeEdit();
       closeDetails();
-      Alert.alert("Success", "Appointment updated successfully!");
+      Alert.alert("Erfolgreich", "Termin erfolgreich aktualisiert!");
     } catch (e: any) {
-      Alert.alert("Error", e?.message ?? "Failed to update appointment");
+      Alert.alert("Fehler", e?.message ?? "Termin konnte nicht aktualisiert werden");
     } finally {
       setIsUpdating(false);
     }
@@ -711,7 +692,7 @@ export default function PatientAppointmentsScreen() {
 
   const submitCreate = async () => {
     if (!createServiceCode || !createDate) {
-      Alert.alert("Error", "Please complete all fields");
+      Alert.alert("Fehler", "Bitte füllen Sie alle Felder aus");
       return;
     }
 
@@ -720,7 +701,7 @@ export default function PatientAppointmentsScreen() {
 
     if (showCreateCustomTime) {
       if (!createCustomStart || !createCustomEnd) {
-        Alert.alert("Error", "Please select start time");
+        Alert.alert("Fehler", "Bitte wählen Sie eine Startzeit");
         return;
       }
       if (!isCustomTimeValid(createCustomStart, createCustomEnd, createDate)) return;
@@ -728,7 +709,7 @@ export default function PatientAppointmentsScreen() {
       endTime = createCustomEnd;
     } else {
       if (!createTimeSlot) {
-        Alert.alert("Error", "Please select a time slot");
+        Alert.alert("Fehler", "Bitte wählen Sie einen Zeitslot");
         return;
       }
       startTime = createTimeSlot.startTime;
@@ -757,19 +738,19 @@ export default function PatientAppointmentsScreen() {
 
       await fetchAppointments();
       closeCreateModal();
-      Alert.alert("Success", "Appointment created successfully!");
+      Alert.alert("Erfolgreich", "Termin erfolgreich erstellt!");
     } catch (e: any) {
-      Alert.alert("Error", e?.message ?? "Failed to create appointment");
+      Alert.alert("Fehler", e?.message ?? "Termin konnte nicht erstellt werden");
     } finally {
       setIsCreating(false);
     }
   };
 
-  // Cancel appointment handlers
-  const handleCancelAppointment = async () => {
+  // Abbrechen appointment handlers
+  const handleAbbrechenAppointment = async () => {
     if (!cancelingAppointment) return;
     
-    setIsCanceling(true);
+    setIsAbbrechening(true);
     
     try {
       const body: any = {
@@ -795,8 +776,8 @@ export default function PatientAppointmentsScreen() {
           result.message || "Appointment cancelled successfully"
         );
         
-        setShowCancelConfirm(false);
-        setCancelingAppointment(null);
+        setShowAbbrechenConfirm(false);
+        setAbbrecheningAppointment(null);
         closeDetails();
         closeEdit();
         
@@ -808,47 +789,47 @@ export default function PatientAppointmentsScreen() {
         );
       }
     } catch (error: any) {
-      console.error("Cancel appointment error:", error);
-      Alert.alert("Error", "Something went wrong. Please try again.");
+      console.error("Abbrechen appointment error:", error);
+      Alert.alert("Fehler", "Etwas ist schiefgelaufen. Bitte versuchen Sie es erneut.");
     } finally {
-      setIsCanceling(false);
+      setIsAbbrechening(false);
     }
   };
 
-  const openCancelConfirm = (apt: Apt) => {
-    setCancelingAppointment(apt);
-    setShowCancelConfirm(true);
+  const openAbbrechenConfirm = (apt: Apt) => {
+    setAbbrecheningAppointment(apt);
+    setShowAbbrechenConfirm(true);
   };
 
-  const closeCancelConfirm = () => {
-    if (!isCanceling) {
-      setShowCancelConfirm(false);
-      setCancelingAppointment(null);
+  const closeAbbrechenConfirm = () => {
+    if (!isAbbrechening) {
+      setShowAbbrechenConfirm(false);
+      setAbbrecheningAppointment(null);
     }
   };
 
-  // Reactivate appointment handlers
-  const openReactivateModal = (apt: Apt) => {
+  // Reaktivieren appointment handlers
+  const openReaktivierenModal = (apt: Apt) => {
     setReactivatingAppointment(apt);
     const aptDate = toDate(apt.appointmentDate);
-    setReactivateDate(aptDate);
-    setReactivateCalendarMonth(new Date(aptDate.getFullYear(), aptDate.getMonth(), 1));
-    setReactivateSlot({ startTime: apt.startTime, endTime: apt.endTime });
-    setShowReactivateModal(true);
+    setReaktivierenDate(aptDate);
+    setReaktivierenCalendarMonth(new Date(aptDate.getFullYear(), aptDate.getMonth(), 1));
+    setReaktivierenSlot({ startTime: apt.startTime, endTime: apt.endTime });
+    setShowReaktivierenModal(true);
   };
 
-  const closeReactivateModal = () => {
+  const closeReaktivierenModal = () => {
     if (!isReactivating) {
-      setShowReactivateModal(false);
+      setShowReaktivierenModal(false);
       setReactivatingAppointment(null);
-      setReactivateDate(null);
-      setReactivateSlot(null);
+      setReaktivierenDate(null);
+      setReaktivierenSlot(null);
     }
   };
 
-  const handleReactivateAppointment = async () => {
+  const handleReaktivierenAppointment = async () => {
     if (!reactivatingAppointment || !reactivateDate || !reactivateSlot) {
-      Alert.alert("Error", "Please select a date and time slot");
+      Alert.alert("Fehler", "Bitte wählen Sie ein Datum und einen Zeitslot");
       return;
     }
 
@@ -881,10 +862,10 @@ export default function PatientAppointmentsScreen() {
           result.message || "Appointment reactivated successfully"
         );
 
-        setShowReactivateModal(false);
+        setShowReaktivierenModal(false);
         setReactivatingAppointment(null);
-        setReactivateDate(null);
-        setReactivateSlot(null);
+        setReaktivierenDate(null);
+        setReaktivierenSlot(null);
         closeDetails();
 
         await fetchAppointments();
@@ -895,8 +876,8 @@ export default function PatientAppointmentsScreen() {
         );
       }
     } catch (error: any) {
-      console.error("Reactivate appointment error:", error);
-      Alert.alert("Error", "Something went wrong. Please try again.");
+      console.error("Reaktivieren appointment error:", error);
+      Alert.alert("Fehler", "Etwas ist schiefgelaufen. Bitte versuchen Sie es erneut.");
     } finally {
       setIsReactivating(false);
     }
@@ -904,25 +885,25 @@ export default function PatientAppointmentsScreen() {
 
   if (loading) {
     return (
-      <View style={[styles.center, { flex: 1, backgroundColor: COLORS.bg }]}>
-        <ActivityIndicator size="large" color={COLORS.accent} />
-        <Text style={{ marginTop: 8, color: COLORS.dim }}>Loading appointments...</Text>
+      <View style={[styles.center, { flex: 1, backgroundColor: COLORS.backgroundGray }]}>
+        <ActivityIndicator size="large" color={COLORS.primary} />
+        <Text style={{ marginTop: SPACING.sm, color: COLORS.textSecondary }}>{de.common.loading}</Text>
       </View>
     );
   }
 
   return (
-    <View style={{ flex: 1, backgroundColor: COLORS.bg }}>
+    <View style={{ flex: 1, backgroundColor: COLORS.backgroundGray }}>
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-          <Text style={styles.backText}>← Back</Text>
+          <Text style={styles.backText}>← Zurück</Text>
         </TouchableOpacity>
         <Text style={styles.title}>{patientName}</Text>
-        <Text style={styles.subtitle}>{allAppointments.length} appointments</Text>
-        
+        <Text style={styles.subtitle}>{allAppointments.length} Termine</Text>
+
         <TouchableOpacity onPress={openCreateModal} style={styles.createBtn}>
-          <Text style={styles.createBtnText}>+ New Appointment</Text>
+          <Text style={styles.createBtnText}>+ Neuer Termin</Text>
         </TouchableOpacity>
       </View>
 
@@ -933,32 +914,32 @@ export default function PatientAppointmentsScreen() {
             onPress={() => setTab("list")}
             style={[styles.tabBtn, tab === "list" && styles.tabActive]}
           >
-            <Text style={[styles.tabText, tab === "list" && styles.tabTextActive]}>List</Text>
+            <Text style={[styles.tabText, tab === "list" && styles.tabTextActive]}>{de.appointments.listView}</Text>
           </TouchableOpacity>
           <TouchableOpacity
             onPress={() => setTab("calendar")}
             style={[styles.tabBtn, tab === "calendar" && styles.tabActive]}
           >
-            <Text style={[styles.tabText, tab === "calendar" && styles.tabTextActive]}>Calendar</Text>
+            <Text style={[styles.tabText, tab === "calendar" && styles.tabTextActive]}>{de.appointments.calendarView}</Text>
           </TouchableOpacity>
         </View>
       </View>
 
       {error && (
-        <View style={{ paddingHorizontal: 16 }}>
-          <Text style={{ color: "crimson" }}>{error}</Text>
+        <View style={{ paddingHorizontal: SPACING.lg }}>
+          <Text style={{ color: COLORS.error }}>{error}</Text>
         </View>
       )}
 
       {tab === "list" ? (
         <>
           {/* Status Filter */}
-          <View style={{ paddingHorizontal: 16, paddingVertical: 12, backgroundColor: COLORS.card }}>
-            <Text style={{ fontSize: 14, fontWeight: "700", color: COLORS.dim, marginBottom: 8 }}>
-              Filter by Status
+          <View style={{ paddingHorizontal: SPACING.lg, paddingVertical: SPACING.md, backgroundColor: COLORS.card }}>
+            <Text style={{ fontSize: 14, fontWeight: "700", color: COLORS.textSecondary, marginBottom: SPACING.sm }}>
+              Nach Status filtern
             </Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-              <View style={{ flexDirection: "row", gap: 8 }}>
+              <View style={{ flexDirection: "row", gap: SPACING.sm }}>
                 <TouchableOpacity
                   onPress={() => setStatusFilter("all")}
                   style={[
@@ -970,10 +951,10 @@ export default function PatientAppointmentsScreen() {
                     styles.filterBtnText,
                     statusFilter === "all" && styles.filterBtnTextActive,
                   ]}>
-                    All ({statusCounts.all})
+                    {de.common.all} ({statusCounts.all})
                   </Text>
                 </TouchableOpacity>
-                
+
                 <TouchableOpacity
                   onPress={() => setStatusFilter("active")}
                   style={[
@@ -985,10 +966,10 @@ export default function PatientAppointmentsScreen() {
                     styles.filterBtnText,
                     statusFilter === "active" && styles.filterBtnTextActive,
                   ]}>
-                    Active ({statusCounts.active})
+                    {de.appointments.status.active} ({statusCounts.active})
                   </Text>
                 </TouchableOpacity>
-                
+
                 <TouchableOpacity
                   onPress={() => setStatusFilter("pending")}
                   style={[
@@ -1000,10 +981,10 @@ export default function PatientAppointmentsScreen() {
                     styles.filterBtnText,
                     statusFilter === "pending" && styles.filterBtnTextActive,
                   ]}>
-                    Pending ({statusCounts.pending})
+                    {de.appointments.status.pending} ({statusCounts.pending})
                   </Text>
                 </TouchableOpacity>
-                
+
                 <TouchableOpacity
                   onPress={() => setStatusFilter("cancelled")}
                   style={[
@@ -1015,7 +996,7 @@ export default function PatientAppointmentsScreen() {
                     styles.filterBtnText,
                     statusFilter === "cancelled" && styles.filterBtnTextActive,
                   ]}>
-                    Cancelled ({statusCounts.cancelled})
+                    {de.appointments.status.cancelled} ({statusCounts.cancelled})
                   </Text>
                 </TouchableOpacity>
               </View>
@@ -1044,7 +1025,7 @@ export default function PatientAppointmentsScreen() {
             contentContainerStyle={{ padding: 16, gap: 8 }}
             ListEmptyComponent={
               <View style={[styles.center, { padding: 24 }]}>
-                <Text style={{ color: COLORS.dim }}>No appointments this month</Text>
+                <Text style={{ color: COLORS.textSecondary }}>Keine Termine in diesem Monat</Text>
               </View>
             }
             renderItem={({ item }) => (
@@ -1053,7 +1034,7 @@ export default function PatientAppointmentsScreen() {
                 <View style={{ flex: 1 }}>
                   <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 4 }}>
                     <Text style={styles.aptTitle}>
-                      {item.serviceCode} • {SERVICE_NAMES[item.serviceCode]}
+                      {item.serviceCode} • {de.serviceCodes[item.serviceCode as keyof typeof de.serviceCodes]}
                     </Text>
                     <View style={[
                       styles.statusBadge,
@@ -1095,7 +1076,7 @@ export default function PatientAppointmentsScreen() {
 
           <View style={{ padding: 16 }}>
             <View style={styles.calGrid}>
-              {["S", "M", "T", "W", "T", "F", "S"].map((d, i) => (
+              {["So", "Mo", "Di", "Mi", "Do", "Fr", "Sa"].map((d, i) => (
                 <Text key={i} style={styles.calHeader}>{d}</Text>
               ))}
             </View>
@@ -1139,7 +1120,7 @@ export default function PatientAppointmentsScreen() {
                   Appointments on {fmtDateShort(selectedCalendarDate)}
                 </Text>
                 {selectedDayAppointments.length === 0 ? (
-                  <Text style={{ color: COLORS.dim, marginTop: 8 }}>No appointments</Text>
+                  <Text style={{ color: COLORS.textSecondary, marginTop: 8 }}>Keine Termine</Text>
                 ) : (
                   selectedDayAppointments.map((item) => (
                     <TouchableOpacity
@@ -1151,7 +1132,7 @@ export default function PatientAppointmentsScreen() {
                       <View style={{ flex: 1 }}>
                         <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 4 }}>
                           <Text style={styles.aptTitle}>
-                            {item.serviceCode} • {SERVICE_NAMES[item.serviceCode]}
+                            {item.serviceCode} • {de.serviceCodes[item.serviceCode as keyof typeof de.serviceCodes]}
                           </Text>
                           <View style={[
                             styles.statusBadge,
@@ -1179,45 +1160,45 @@ export default function PatientAppointmentsScreen() {
       )}
 
 {/* Details Modal */}
-<Modal visible={detailsOpen} transparent animationType="fade" onRequestClose={closeDetails}>
+<Modal visible={detailsOpen} transparent animationType="fade" onRequestSchließen={closeDetails}>
   <View style={styles.overlay}>
     <View style={styles.modalCard}>
       <View style={styles.modalHeader}>
-        <Text style={styles.modalTitle}>Appointment Details</Text>
+        <Text style={styles.modalTitle}>Termindetails</Text>
         <TouchableOpacity onPress={closeDetails}>
-          <Text style={{ fontSize: 20, color: COLORS.dim, fontWeight: "800" }}>✕</Text>
+          <Text style={{ fontSize: 20, color: COLORS.textSecondary, fontWeight: "800" }}>✕</Text>
         </TouchableOpacity>
       </View>
       
       {selectedDetails && (
         <>
-          <DetailRow label="Service" value={`${selectedDetails.serviceCode} - ${SERVICE_NAMES[selectedDetails.serviceCode]}`} />
+          <DetailRow label="Service" value={`${selectedDetails.serviceCode} - ${de.serviceCodes[selectedDetails.serviceCode as keyof typeof de.serviceCodes]}`} />
           <DetailRow label="Date" value={selectedDetails.appointmentDate} />
           <DetailRow label="Time" value={`${selectedDetails.startTime} – ${selectedDetails.endTime}`} />
           <DetailRow label="Duration" value={`${selectedDetails.duration} min`} />
           <DetailRow label="Status" value={selectedDetails.status ?? "—"} />
           
           {selectedDetails.status?.toLowerCase() === "cancelled" ? (
-            // Show Reactivate button for cancelled appointments
+            // Show Reaktivieren button for cancelled appointments
             <View style={{ flexDirection: "row", marginTop: 16, gap: 10 }}>
               <TouchableOpacity
                 onPress={() => {
                   closeDetails();
-                  if (selectedDetails) openReactivateModal(selectedDetails);
+                  if (selectedDetails) openReaktivierenModal(selectedDetails);
                 }}
                 style={[styles.modalBtn, { flex: 1, backgroundColor: "#16a34a" }]}
               >
-                <Text style={styles.modalBtnText}>Reactivate</Text>
+                <Text style={styles.modalBtnText}>Reaktivieren</Text>
               </TouchableOpacity>
               <TouchableOpacity 
                 onPress={closeDetails} 
                 style={[styles.modalBtnSecondary, { flex: 1 }]}
               >
-                <Text style={styles.modalBtnSecondaryText}>Close</Text>
+                <Text style={styles.modalBtnSecondaryText}>Schließen</Text>
               </TouchableOpacity>
             </View>
           ) : (
-            // Show Edit and Cancel buttons for non-cancelled appointments
+            // Show Edit and Abbrechen buttons for non-cancelled appointments
             <View style={{ flexDirection: "row", marginTop: 16, gap: 10 }}>
               <TouchableOpacity
                 onPress={() => {
@@ -1232,11 +1213,11 @@ export default function PatientAppointmentsScreen() {
               <TouchableOpacity
                 onPress={() => {
                   closeDetails();
-                  if (selectedDetails) openCancelConfirm(selectedDetails);
+                  if (selectedDetails) openAbbrechenConfirm(selectedDetails);
                 }}
                 style={[styles.cancelBtn, { flex: 1 }]}
               >
-                <Text style={styles.cancelBtnText}>Cancel</Text>
+                <Text style={styles.cancelBtnText}>Abbrechen</Text>
               </TouchableOpacity>
             </View>
           )}
@@ -1246,17 +1227,17 @@ export default function PatientAppointmentsScreen() {
   </View>
 </Modal>
 
-{/* Cancel Confirmation Modal */}
+{/* Abbrechen Confirmation Modal */}
 <Modal
-  visible={showCancelConfirm}
+  visible={showAbbrechenConfirm}
   transparent
   animationType="fade"
-  onRequestClose={closeCancelConfirm}
+  onRequestSchließen={closeAbbrechenConfirm}
 >
   <View style={styles.overlay}>
     <View style={[styles.modalCard, { maxWidth: 400 }]}>
       <View style={styles.modalHeader}>
-        <Text style={styles.modalTitle}>Cancel Appointment</Text>
+        <Text style={styles.modalTitle}>Termin absagen</Text>
       </View>
 
       {cancelingAppointment && (
@@ -1268,7 +1249,7 @@ export default function PatientAppointmentsScreen() {
 
             <View style={styles.cancelAppointmentInfo}>
               <Text style={styles.cancelAppointmentTitle}>
-                {SERVICE_NAMES[cancelingAppointment.serviceCode] || cancelingAppointment.serviceCode}
+                {de.serviceCodes[cancelingAppointment.serviceCode as keyof typeof de.serviceCodes] || cancelingAppointment.serviceCode}
               </Text>
               <Text style={styles.cancelAppointmentDetails}>
                 Date: {cancelingAppointment.appointmentDate}
@@ -1290,22 +1271,22 @@ export default function PatientAppointmentsScreen() {
 
           <View style={{ flexDirection: "row", gap: 10, marginTop: 16 }}>
             <TouchableOpacity
-              onPress={closeCancelConfirm}
-              disabled={isCanceling}
+              onPress={closeAbbrechenConfirm}
+              disabled={isAbbrechening}
               style={[styles.modalBtnSecondary, { flex: 1 }]}
             >
-              <Text style={styles.modalBtnSecondaryText}>Go Back</Text>
+              <Text style={styles.modalBtnSecondaryText}>Zurück</Text>
             </TouchableOpacity>
             <TouchableOpacity
-              onPress={handleCancelAppointment}
-              disabled={isCanceling}
-              style={[styles.cancelBtn, { flex: 1 }, isCanceling && { opacity: 0.6 }]}
+              onPress={handleAbbrechenAppointment}
+              disabled={isAbbrechening}
+              style={[styles.cancelBtn, { flex: 1 }, isAbbrechening && { opacity: 0.6 }]}
             >
-              {isCanceling ? (
+              {isAbbrechening ? (
                 <ActivityIndicator color="white" size="small" />
               ) : (
                 <Text style={styles.cancelBtnText}>
-                  Yes, Cancel It
+                  Yes, Abbrechen It
                 </Text>
               )}
             </TouchableOpacity>
@@ -1316,22 +1297,22 @@ export default function PatientAppointmentsScreen() {
   </View>
 </Modal>
 
-{/* Reactivate Appointment Modal */}
+{/* Reaktivieren Appointment Modal */}
 <Modal
-  visible={showReactivateModal}
+  visible={showReaktivierenModal}
   transparent
   animationType="fade"
-  onRequestClose={closeReactivateModal}
+  onRequestSchließen={closeReaktivierenModal}
 >
   <View style={styles.overlay}>
     <ScrollView contentContainerStyle={{ flexGrow: 1, justifyContent: "center", padding: 20 }}>
       <View style={[styles.modalCard, { maxHeight: '90%', maxWidth: 400 }]}>
         <View style={styles.modalHeader}>
           <Text style={styles.modalTitle}>
-            Reactivate & Reschedule {reactivatingAppointment?.serviceCode}
+            Reaktivieren & Reschedule {reactivatingAppointment?.serviceCode}
           </Text>
-          <TouchableOpacity onPress={closeReactivateModal}>
-            <Text style={{ fontWeight: "800", color: COLORS.dim, fontSize: 20 }}>✕</Text>
+          <TouchableOpacity onPress={closeReaktivierenModal}>
+            <Text style={{ fontWeight: "800", color: COLORS.textSecondary, fontSize: 20 }}>✕</Text>
           </TouchableOpacity>
         </View>
 
@@ -1352,7 +1333,7 @@ export default function PatientAppointmentsScreen() {
             {/* Month navigation */}
             <View style={styles.monthNav}>
               <TouchableOpacity
-                onPress={() => setReactivateCalendarMonth(
+                onPress={() => setReaktivierenCalendarMonth(
                   new Date(reactivateCalendarMonth.getFullYear(), reactivateCalendarMonth.getMonth() - 1, 1)
                 )}
                 style={styles.navBtn}
@@ -1363,7 +1344,7 @@ export default function PatientAppointmentsScreen() {
                 {monthTitle(reactivateCalendarMonth)}
               </Text>
               <TouchableOpacity
-                onPress={() => setReactivateCalendarMonth(
+                onPress={() => setReaktivierenCalendarMonth(
                   new Date(reactivateCalendarMonth.getFullYear(), reactivateCalendarMonth.getMonth() + 1, 1)
                 )}
                 style={styles.navBtn}
@@ -1374,7 +1355,7 @@ export default function PatientAppointmentsScreen() {
 
             {/* Week header */}
             <View style={styles.calGrid}>
-              {["S", "M", "T", "W", "T", "F", "S"].map((d, i) => (
+              {["So", "Mo", "Di", "Mi", "Do", "Fr", "Sa"].map((d, i) => (
                 <Text key={i} style={styles.calHeader}>{d}</Text>
               ))}
             </View>
@@ -1394,7 +1375,7 @@ export default function PatientAppointmentsScreen() {
                 return (
                   <TouchableOpacity
                     key={idx}
-                    onPress={() => isAvailable && setReactivateDate(d)}
+                    onPress={() => isAvailable && setReaktivierenDate(d)}
                     disabled={!isAvailable}
                     style={[
                       styles.calCell,
@@ -1413,13 +1394,13 @@ export default function PatientAppointmentsScreen() {
             {/* Available slots */}
             {reactivateDate && (
               <View style={{ marginTop: 16 }}>
-                <Text style={styles.inputLabel}>Available Time Slots</Text>
+                <Text style={styles.inputLabel}>Verfügbare Zeitslots</Text>
                 {reactivateAvailableSlots.length > 0 ? (
                   <ScrollView style={styles.timeScroll} nestedScrollEnabled>
                     {reactivateAvailableSlots.map((slot, i) => (
                       <TouchableOpacity
                         key={i}
-                        onPress={() => setReactivateSlot(slot)}
+                        onPress={() => setReaktivierenSlot(slot)}
                         style={[
                           styles.timeOption,
                           reactivateSlot?.startTime === slot.startTime && 
@@ -1439,21 +1420,21 @@ export default function PatientAppointmentsScreen() {
                     ))}
                   </ScrollView>
                 ) : (
-                  <Text style={{ color: COLORS.dim, marginTop: 8 }}>No available slots</Text>
+                  <Text style={{ color: COLORS.textSecondary, marginTop: 8 }}>Keine verfügbaren Slots</Text>
                 )}
               </View>
             )}
 
             <View style={{ flexDirection: "row", marginTop: 16, gap: 10 }}>
               <TouchableOpacity
-                onPress={closeReactivateModal}
+                onPress={closeReaktivierenModal}
                 disabled={isReactivating}
                 style={[styles.modalBtnSecondary, { flex: 1 }]}
               >
-                <Text style={styles.modalBtnSecondaryText}>Cancel</Text>
+                <Text style={styles.modalBtnSecondaryText}>Abbrechen</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                onPress={handleReactivateAppointment}
+                onPress={handleReaktivierenAppointment}
                 disabled={isReactivating || !reactivateDate || !reactivateSlot}
                 style={[
                   styles.modalBtn,
@@ -1464,7 +1445,7 @@ export default function PatientAppointmentsScreen() {
                 {isReactivating ? (
                   <ActivityIndicator color="white" size="small" />
                 ) : (
-                  <Text style={styles.modalBtnText}>Reactivate</Text>
+                  <Text style={styles.modalBtnText}>Reaktivieren</Text>
                 )}
               </TouchableOpacity>
             </View>
@@ -1477,21 +1458,21 @@ export default function PatientAppointmentsScreen() {
 
 
 {/* Edit Modal - CONTINUES FROM PART 1 */}
-<Modal visible={editOpen} transparent animationType="fade" onRequestClose={closeEdit}>
+<Modal visible={editOpen} transparent animationType="fade" onRequestSchließen={closeEdit}>
   <View style={styles.overlay}>
     <ScrollView contentContainerStyle={{ flexGrow: 1, justifyContent: "center", padding: 20 }}>
       <View style={[styles.modalCard, { maxHeight: '90%' }]}>
         <View style={styles.modalHeader}>
-          <Text style={styles.modalTitle}>Edit Appointment</Text>
+          <Text style={styles.modalTitle}>Termin bearbeiten</Text>
           <TouchableOpacity onPress={closeEdit}>
-            <Text style={{ fontSize: 20, color: COLORS.dim, fontWeight: "800" }}>✕</Text>
+            <Text style={{ fontSize: 20, color: COLORS.textSecondary, fontWeight: "800" }}>✕</Text>
           </TouchableOpacity>
         </View>
 
         {selectedEdit && (
           <ScrollView nestedScrollEnabled>
-            <Text style={{ color: COLORS.dim, marginBottom: 12, fontWeight: "600" }}>
-              {selectedEdit.serviceCode} - {SERVICE_NAMES[selectedEdit.serviceCode]}
+            <Text style={{ color: COLORS.textSecondary, marginBottom: 12, fontWeight: "600" }}>
+              {selectedEdit.serviceCode} - {de.serviceCodes[selectedEdit.serviceCode as keyof typeof de.serviceCodes]}
             </Text>
 
             {/* Calendar */}
@@ -1512,7 +1493,7 @@ export default function PatientAppointmentsScreen() {
             </View>
 
             <View style={styles.calGrid}>
-              {["S", "M", "T", "W", "T", "F", "S"].map((d, i) => (
+              {["So", "Mo", "Di", "Mi", "Do", "Fr", "Sa"].map((d, i) => (
                 <Text key={i} style={styles.calHeader}>{d}</Text>
               ))}
             </View>
@@ -1549,7 +1530,7 @@ export default function PatientAppointmentsScreen() {
             {/* Time Slots */}
             {editDate && (
               <View style={{ marginTop: 16 }}>
-                <Text style={styles.inputLabel}>Available Time Slots</Text>
+                <Text style={styles.inputLabel}>Verfügbare Zeitslots</Text>
                 {editAvailableSlots.length > 0 ? (
                   <ScrollView style={styles.timeScroll} nestedScrollEnabled>
                     {editAvailableSlots.map((slot, i) => (
@@ -1578,7 +1559,7 @@ export default function PatientAppointmentsScreen() {
                     ))}
                   </ScrollView>
                 ) : (
-                  <Text style={{ color: COLORS.dim, marginTop: 8 }}>No available slots</Text>
+                  <Text style={{ color: COLORS.textSecondary, marginTop: 8 }}>Keine verfügbaren Slots</Text>
                 )}
 
                 {/* Custom Time Option */}
@@ -1611,7 +1592,7 @@ export default function PatientAppointmentsScreen() {
                             selectedEdit.serviceCode
                           ).length === 0 ? (
                             <View style={{ padding: 12 }}>
-                              <Text style={{ color: COLORS.dim, textAlign: "center" }}>
+                              <Text style={{ color: COLORS.textSecondary, textAlign: "center" }}>
                                 No available time slots
                               </Text>
                             </View>
@@ -1649,14 +1630,14 @@ export default function PatientAppointmentsScreen() {
                     <View style={{ marginBottom: 12 }}>
                       <Text style={styles.inputLabel}>End Time (Auto-calculated)</Text>
                       <View style={styles.disabledInput}>
-                        <Text style={{ color: COLORS.dim }}>
+                        <Text style={{ color: COLORS.textSecondary }}>
                           {editCustomEnd || "Will be calculated automatically"}
                         </Text>
                       </View>
                     </View>
 
                     {editCustomStart && editCustomEnd && (
-                      <Text style={{ fontSize: 12, color: COLORS.dim, marginTop: 8 }}>
+                      <Text style={{ fontSize: 12, color: COLORS.textSecondary, marginTop: 8 }}>
                         Duration: {getServiceDuration(selectedEdit.serviceCode)} minutes
                       </Text>
                     )}
@@ -1674,7 +1655,7 @@ export default function PatientAppointmentsScreen() {
                 <Text style={styles.modalBtnText}>{isUpdating ? "Saving..." : "Save"}</Text>
               </TouchableOpacity>
               <TouchableOpacity onPress={closeEdit} style={[styles.modalBtnSecondary, { flex: 1 }]}>
-                <Text style={styles.modalBtnSecondaryText}>Cancel</Text>
+                <Text style={styles.modalBtnSecondaryText}>Abbrechen</Text>
               </TouchableOpacity>
             </View>
           </ScrollView>
@@ -1685,20 +1666,20 @@ export default function PatientAppointmentsScreen() {
 </Modal>
 
 {/* Create Modal */}
-<Modal visible={showCreateModal} transparent animationType="fade" onRequestClose={closeCreateModal}>
+<Modal visible={showCreateModal} transparent animationType="fade" onRequestSchließen={closeCreateModal}>
   <View style={styles.overlay}>
     <ScrollView contentContainerStyle={{ flexGrow: 1, justifyContent: "center", padding: 20 }}>
       <View style={[styles.modalCard, { maxHeight: '90%' }]}>
         <View style={styles.modalHeader}>
-          <Text style={styles.modalTitle}>New Appointment</Text>
+          <Text style={styles.modalTitle}>Neuer Termin</Text>
           <TouchableOpacity onPress={closeCreateModal}>
-            <Text style={{ fontSize: 20, color: COLORS.dim, fontWeight: "800" }}>✕</Text>
+            <Text style={{ fontSize: 20, color: COLORS.textSecondary, fontWeight: "800" }}>✕</Text>
           </TouchableOpacity>
         </View>
 
         <ScrollView nestedScrollEnabled>
           {/* Service selection */}
-          <Text style={styles.inputLabel}>Select Service</Text>
+          <Text style={styles.inputLabel}>Service auswählen</Text>
           <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 16 }}>
             {availableServiceCodes.map(code => (
               <TouchableOpacity
@@ -1749,7 +1730,7 @@ export default function PatientAppointmentsScreen() {
                   today.setHours(0, 0, 0, 0);
                   d.setHours(0, 0, 0, 0);
                   
-                  const isAvailable = isDateAvailable(d, createServiceCode) && d >= today;
+                  const isAvailable = createServiceCode ? isDateAvailable(d, createServiceCode) && d >= today : false;
                   const isSelected = createDate && sameDay(d, createDate);
                   
                   return (
@@ -1774,7 +1755,7 @@ export default function PatientAppointmentsScreen() {
               {/* Time Slots */}
               {createDate && (
                 <View style={{ marginTop: 16 }}>
-                  <Text style={styles.inputLabel}>Available Time Slots</Text>
+                  <Text style={styles.inputLabel}>Verfügbare Zeitslots</Text>
                   {createAvailableSlots.length > 0 ? (
                     <ScrollView style={styles.timeScroll} nestedScrollEnabled>
                       {createAvailableSlots.map((slot, i) => (
@@ -1803,7 +1784,7 @@ export default function PatientAppointmentsScreen() {
                       ))}
                     </ScrollView>
                   ) : (
-                    <Text style={{ color: COLORS.dim, marginTop: 8 }}>No available slots</Text>
+                    <Text style={{ color: COLORS.textSecondary, marginTop: 8 }}>Keine verfügbaren Slots</Text>
                   )}
 
                   {/* Custom Time Option */}
@@ -1836,7 +1817,7 @@ export default function PatientAppointmentsScreen() {
                               createServiceCode
                             ).length === 0 ? (
                               <View style={{ padding: 12 }}>
-                                <Text style={{ color: COLORS.dim, textAlign: "center" }}>
+                                <Text style={{ color: COLORS.textSecondary, textAlign: "center" }}>
                                   No available time slots
                                 </Text>
                               </View>
@@ -1874,14 +1855,14 @@ export default function PatientAppointmentsScreen() {
                       <View style={{ marginBottom: 12 }}>
                         <Text style={styles.inputLabel}>End Time (Auto-calculated)</Text>
                         <View style={styles.disabledInput}>
-                          <Text style={{ color: COLORS.dim }}>
+                          <Text style={{ color: COLORS.textSecondary }}>
                             {createCustomEnd || "Will be calculated automatically"}
                           </Text>
                         </View>
                       </View>
 
                       {createCustomStart && createCustomEnd && (
-                        <Text style={{ fontSize: 12, color: COLORS.dim, marginTop: 8 }}>
+                        <Text style={{ fontSize: 12, color: COLORS.textSecondary, marginTop: 8 }}>
                           Duration: {getServiceDuration(createServiceCode)} minutes
                         </Text>
                       )}
@@ -1899,7 +1880,7 @@ export default function PatientAppointmentsScreen() {
                   <Text style={styles.modalBtnText}>{isCreating ? "Creating..." : "Create"}</Text>
                 </TouchableOpacity>
                 <TouchableOpacity onPress={closeCreateModal} style={[styles.modalBtnSecondary, { flex: 1 }]}>
-                  <Text style={styles.modalBtnSecondaryText}>Cancel</Text>
+                  <Text style={styles.modalBtnSecondaryText}>Abbrechen</Text>
                 </TouchableOpacity>
               </View>
             </>
@@ -1917,7 +1898,7 @@ export default function PatientAppointmentsScreen() {
 function DetailRow({ label, value }: { label: string; value: string }) {
   return (
     <View style={{ flexDirection: "row", marginTop: 8 }}>
-      <Text style={{ width: 100, color: COLORS.dim, fontWeight: "700" }}>{label}:</Text>
+      <Text style={{ width: 100, color: COLORS.textSecondary, fontWeight: "700" }}>{label}:</Text>
       <Text style={{ flex: 1, color: COLORS.text }}>{value}</Text>
     </View>
   );
@@ -1932,14 +1913,14 @@ const styles = StyleSheet.create({
     paddingBottom: 12,
     backgroundColor: COLORS.card,
     borderBottomWidth: 1,
-    borderBottomColor: COLORS.line,
+    borderBottomColor: COLORS.border,
   },
   backBtn: { marginBottom: 8 },
-  backText: { color: COLORS.accent, fontSize: 14, fontWeight: "700" },
+  backText: { color: COLORS.primary, fontSize: 14, fontWeight: "700" },
   title: { fontSize: 24, fontWeight: "800", color: COLORS.text },
-  subtitle: { fontSize: 14, color: COLORS.dim, marginTop: 4, marginBottom: 12 },
+  subtitle: { fontSize: 14, color: COLORS.textSecondary, marginTop: 4, marginBottom: 12 },
   createBtn: {
-    backgroundColor: COLORS.accent,
+    backgroundColor: COLORS.primary,
     paddingVertical: 10,
     paddingHorizontal: 16,
     borderRadius: 8,
@@ -1948,7 +1929,7 @@ const styles = StyleSheet.create({
   createBtnText: { color: "white", fontWeight: "700", fontSize: 14 },
   tabsWrap: { paddingHorizontal: 16, paddingVertical: 12, backgroundColor: COLORS.card },
   tabs: {
-    backgroundColor: COLORS.bg,
+    backgroundColor: COLORS.backgroundGray,
     borderRadius: 8,
     flexDirection: "row",
     padding: 4,
@@ -1956,7 +1937,7 @@ const styles = StyleSheet.create({
   },
   tabBtn: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 6 },
   tabActive: { backgroundColor: COLORS.card },
-  tabText: { color: COLORS.dim, fontWeight: "700" },
+  tabText: { color: COLORS.textSecondary, fontWeight: "700" },
   tabTextActive: { color: COLORS.text },
   monthNav: {
     flexDirection: "row",
@@ -1969,7 +1950,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 6,
     borderRadius: 8,
-    backgroundColor: COLORS.bg,
+    backgroundColor: COLORS.backgroundGray,
   },
   navBtnText: { color: COLORS.text, fontWeight: "700" },
   monthText: { fontSize: 16, fontWeight: "800", color: COLORS.text },
@@ -1988,7 +1969,7 @@ const styles = StyleSheet.create({
   },
   colorDot: { width: 12, height: 12, borderRadius: 6 },
   aptTitle: { fontSize: 14, fontWeight: "700", color: COLORS.text },
-  aptSub: { fontSize: 12, color: COLORS.dim, marginTop: 2 },
+  aptSub: { fontSize: 12, color: COLORS.textSecondary, marginTop: 2 },
   calGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
@@ -1998,7 +1979,7 @@ const styles = StyleSheet.create({
     width: "13%",
     textAlign: "center",
     fontWeight: "700",
-    color: COLORS.dim,
+    color: COLORS.textSecondary,
     fontSize: 12,
     paddingVertical: 6,
   },
@@ -2012,7 +1993,7 @@ const styles = StyleSheet.create({
     justifyContent: "flex-start",
   },
   calCellSelected: {
-    backgroundColor: COLORS.accent,
+    backgroundColor: COLORS.primary,
   },
   calDay: { fontSize: 14, fontWeight: "700", color: COLORS.text },
   calApt: {
@@ -2049,7 +2030,7 @@ const styles = StyleSheet.create({
   },
   modalTitle: { fontSize: 18, fontWeight: "800", color: COLORS.text },
   modalBtn: {
-    backgroundColor: COLORS.accent,
+    backgroundColor: COLORS.primary,
     paddingVertical: 12,
     borderRadius: 8,
     alignItems: "center",
@@ -2057,30 +2038,30 @@ const styles = StyleSheet.create({
   modalBtnText: { color: "white", fontWeight: "700" },
   modalBtnSecondary: {
     borderWidth: 1,
-    borderColor: COLORS.accent,
+    borderColor: COLORS.primary,
     paddingVertical: 12,
     borderRadius: 8,
     alignItems: "center",
   },
-  modalBtnSecondaryText: { color: COLORS.accent, fontWeight: "700" },
+  modalBtnSecondaryText: { color: COLORS.primary, fontWeight: "700" },
   inputLabel: {
     fontSize: 12,
     fontWeight: "700",
-    color: COLORS.dim,
+    color: COLORS.textSecondary,
     marginBottom: 6,
   },
   timeScroll: {
     maxHeight: 150,
-    backgroundColor: COLORS.bg,
+    backgroundColor: COLORS.backgroundGray,
     borderRadius: 8,
   },
   timeOption: {
     paddingVertical: 10,
     paddingHorizontal: 12,
     borderBottomWidth: 1,
-    borderBottomColor: COLORS.line,
+    borderBottomColor: COLORS.border,
   },
-  timeOptionActive: { backgroundColor: COLORS.accent },
+  timeOptionActive: { backgroundColor: COLORS.primary },
   timeOptionText: { fontSize: 14, color: COLORS.text },
   timeOptionTextActive: { color: "white", fontWeight: "700" },
   serviceBtn: {
@@ -2088,25 +2069,25 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: COLORS.line,
-    backgroundColor: COLORS.bg,
+    borderColor: COLORS.border,
+    backgroundColor: COLORS.backgroundGray,
   },
   serviceBtnActive: {
-    backgroundColor: COLORS.accent,
-    borderColor: COLORS.accent,
+    backgroundColor: COLORS.primary,
+    borderColor: COLORS.primary,
   },
   serviceBtnText: { fontSize: 14, fontWeight: "700", color: COLORS.text },
   serviceBtnTextActive: { color: "white" },
   customTimeBtn: {
-    backgroundColor: COLORS.bg,
+    backgroundColor: COLORS.backgroundGray,
     paddingVertical: 10,
     paddingHorizontal: 12,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: COLORS.accent,
+    borderColor: COLORS.primary,
   },
   customTimeBtnText: {
-    color: COLORS.accent,
+    color: COLORS.primary,
     fontWeight: "700",
     textAlign: "center",
   },
@@ -2116,7 +2097,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#F9FBFA",
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: COLORS.line,
+    borderColor: COLORS.border,
   },
   customTimeTitle: {
     fontSize: 14,
@@ -2133,7 +2114,7 @@ const styles = StyleSheet.create({
   availableTimeLabel: {
     fontSize: 12,
     fontWeight: "700",
-    color: COLORS.dim,
+    color: COLORS.textSecondary,
     marginBottom: 8,
   },
   availableTimeText: {
@@ -2145,14 +2126,14 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.card,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: COLORS.line,
+    borderColor: COLORS.border,
     maxHeight: 150,
   },
   timePicker: {
     maxHeight: 150,
   },
   disabledInput: {
-    backgroundColor: COLORS.bg,
+    backgroundColor: COLORS.backgroundGray,
     borderRadius: 8,
     padding: 12,
   },
@@ -2160,18 +2141,18 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 20,
-    backgroundColor: COLORS.bg,
+    backgroundColor: COLORS.backgroundGray,
     borderWidth: 1,
-    borderColor: COLORS.line,
+    borderColor: COLORS.border,
   },
   filterBtnActive: {
-    backgroundColor: COLORS.accent,
-    borderColor: COLORS.accent,
+    backgroundColor: COLORS.primary,
+    borderColor: COLORS.primary,
   },
   filterBtnText: {
     fontSize: 13,
     fontWeight: "700",
-    color: COLORS.dim,
+    color: COLORS.textSecondary,
   },
   filterBtnTextActive: {
     color: "white",
@@ -2197,11 +2178,11 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
   cancelAppointmentInfo: {
-    backgroundColor: COLORS.bg,
+    backgroundColor: COLORS.backgroundGray,
     borderRadius: 12,
     padding: 16,
     borderWidth: 1,
-    borderColor: COLORS.line,
+    borderColor: COLORS.border,
   },
   cancelAppointmentTitle: {
     fontSize: 18,
@@ -2211,7 +2192,7 @@ const styles = StyleSheet.create({
   },
   cancelAppointmentDetails: {
     fontSize: 14,
-    color: COLORS.dim,
+    color: COLORS.textSecondary,
     marginBottom: 6,
   },
   warningBox: {

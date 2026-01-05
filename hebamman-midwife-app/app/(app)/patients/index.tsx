@@ -14,21 +14,8 @@ import { useRouter } from "expo-router";
 import { useAuth } from "@/context/AuthContext";
 import { api } from "@/lib/api";
 import { useMidwifeProfile } from "@/hooks/useMidwifeProfile";
-
-// -------------------- Theme --------------------
-const COLORS = {
-  bg: "#F6F8F7",
-  card: "#FFFFFF",
-  text: "#1D1D1F",
-  dim: "#5C6B63",
-  accent: "#2E5A49",
-  sage: "#7F9086",
-  amber: "#EAB308",
-  green: "#22C55E",
-  red: "#EF4444",
-  blue: "#3B82F6",
-  line: "#E5E7EB",
-};
+import { COLORS, SPACING, BORDER_RADIUS, SHADOWS, STATUS_COLORS } from "@/constants/theme";
+import de from "@/constants/i18n";
 
 // -------------------- Types --------------------
 type Patient = {
@@ -56,18 +43,26 @@ type Patient = {
 
 type FilterType = "all" | "pending" | "converted" | "cancelled";
 
+// Get German label for client status
+const getClientStatusLabel = (status: string) => {
+  if (status === "converted") return de.patients.status.schwanger;
+  if (status === "pending") return de.patients.status.pending;
+  if (status === "cancelled") return de.patients.status.cancelled;
+  return status;
+};
+
 // Helper functions for client status styling
 const getClientStatusBadgeStyle = (status: string) => {
   return {
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 12,
+    paddingHorizontal: SPACING.sm,
+    paddingVertical: 4,
+    borderRadius: BORDER_RADIUS.sm,
     backgroundColor:
       status === "converted"
-        ? "#D1FAE5"
+        ? COLORS.successLight
         : status === "pending"
-        ? "#FEF3C7"
-        : "#FEE2E2",
+        ? COLORS.warningLight
+        : COLORS.errorLight,
   };
 };
 
@@ -77,25 +72,25 @@ const getClientStatusTextStyle = (status: string) => {
     fontWeight: "700" as const,
     color:
       status === "converted"
-        ? "#065F46"
+        ? COLORS.success
         : status === "pending"
-        ? "#92400E"
-        : "#991B1B",
+        ? COLORS.warning
+        : COLORS.error,
   };
 };
 
-// Helper functions for appointment status styling (optional - different colors)
+// Helper functions for appointment status styling
 const getAppointmentStatusBadgeStyle = (status: string) => {
   return {
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 12,
+    paddingHorizontal: SPACING.sm,
+    paddingVertical: 4,
+    borderRadius: BORDER_RADIUS.sm,
     backgroundColor:
       status === "active"
-        ? "#DBEAFE"  // Blue
+        ? COLORS.infoLight
         : status === "pending"
-        ? "#FEF3C7"  // Yellow
-        : "#FEE2E2",  // Red
+        ? COLORS.warningLight
+        : COLORS.errorLight,
   };
 };
 
@@ -105,10 +100,10 @@ const getAppointmentStatusTextStyle = (status: string) => {
     fontWeight: "700" as const,
     color:
       status === "active"
-        ? "#1E40AF"
+        ? COLORS.info
         : status === "pending"
-        ? "#92400E"
-        : "#991B1B",
+        ? COLORS.warning
+        : COLORS.error,
   };
 };
 
@@ -201,19 +196,19 @@ export default function PatientsScreen() {
   // Render loading
   if (pf.status === "loading" || !midwifeId) {
     return (
-      <View style={[styles.center, { flex: 1, backgroundColor: COLORS.bg }]}>
-        <ActivityIndicator size="large" color={COLORS.accent} />
-        <Text style={{ marginTop: 8, color: COLORS.dim }}>Loading...</Text>
+      <View style={[styles.center, { flex: 1, backgroundColor: COLORS.background }]}>
+        <ActivityIndicator size="large" color={COLORS.primary} />
+        <Text style={{ marginTop: 8, color: COLORS.textSecondary }}>{de.common.loading}</Text>
       </View>
     );
   }
 
   return (
-    <View style={{ flex: 1, backgroundColor: COLORS.bg }}>
+    <View style={{ flex: 1, backgroundColor: COLORS.background }}>
       {/* Header */}
       <View style={styles.header}>
-        <Text style={styles.title}>My Patients</Text>
-        <Text style={styles.subtitle}>{counts.all} total patients</Text>
+        <Text style={styles.title}>{de.patients.title}</Text>
+        <Text style={styles.subtitle}>{counts.all} {de.patients.totalCount}</Text>
       </View>
 
       {/* Filters */}
@@ -224,34 +219,34 @@ export default function PatientsScreen() {
             style={[styles.filterBtn, filter === "all" && styles.filterBtnActive]}
           >
             <Text style={[styles.filterText, filter === "all" && styles.filterTextActive]}>
-              All ({counts.all})
+              {de.common.all} ({counts.all})
             </Text>
           </TouchableOpacity>
-          
+
           <TouchableOpacity
             onPress={() => setFilter("pending")}
             style={[styles.filterBtn, filter === "pending" && styles.filterBtnActive]}
           >
             <Text style={[styles.filterText, filter === "pending" && styles.filterTextActive]}>
-              Pending ({counts.pending})
+              {de.patients.status.pending} ({counts.pending})
             </Text>
           </TouchableOpacity>
-          
+
           <TouchableOpacity
             onPress={() => setFilter("converted")}
             style={[styles.filterBtn, filter === "converted" && styles.filterBtnActive]}
           >
             <Text style={[styles.filterText, filter === "converted" && styles.filterTextActive]}>
-              Converted ({counts.converted})
+              {de.patients.categories.pregnant} ({counts.converted})
             </Text>
           </TouchableOpacity>
-          
+
           <TouchableOpacity
             onPress={() => setFilter("cancelled")}
             style={[styles.filterBtn, filter === "cancelled" && styles.filterBtnActive]}
           >
             <Text style={[styles.filterText, filter === "cancelled" && styles.filterTextActive]}>
-              Cancelled ({counts.cancelled})
+              {de.patients.status.cancelled} ({counts.cancelled})
             </Text>
           </TouchableOpacity>
         </ScrollView>
@@ -259,25 +254,25 @@ export default function PatientsScreen() {
 
       {/* Error */}
       {error && (
-        <View style={{ paddingHorizontal: 16, paddingVertical: 8 }}>
-          <Text style={{ color: COLORS.red }}>{error}</Text>
+        <View style={{ paddingHorizontal: SPACING.lg, paddingVertical: SPACING.sm }}>
+          <Text style={{ color: COLORS.error }}>{error}</Text>
         </View>
       )}
 
       {/* List */}
       {loading ? (
-        <View style={[styles.center, { padding: 20 }]}>
-          <ActivityIndicator size="large" color={COLORS.accent} />
+        <View style={[styles.center, { padding: SPACING.xl }]}>
+          <ActivityIndicator size="large" color={COLORS.primary} />
         </View>
       ) : (
         <FlatList
           data={filteredPatients}
           keyExtractor={(item) => item._id}
-          contentContainerStyle={{ padding: 16, gap: 12 }}
+          contentContainerStyle={{ padding: SPACING.lg, gap: SPACING.md }}
           ListEmptyComponent={
-            <View style={[styles.center, { padding: 24 }]}>
-              <Text style={{ color: COLORS.dim, textAlign: "center" }}>
-                No {filter !== "all" ? filter : ""} patients found
+            <View style={[styles.center, { padding: SPACING.xxl }]}>
+              <Text style={{ color: COLORS.textSecondary, textAlign: "center" }}>
+                {de.patients.noPatients}
               </Text>
             </View>
           }
@@ -291,13 +286,13 @@ export default function PatientsScreen() {
                 <Text style={styles.patientEmail}>{item.email}</Text>
                 <Text style={styles.patientPhone}>{item.phoneNumber}</Text>
                 <Text style={styles.patientDate}>
-                  Booked: {item.date} • {item.selectedSlot}
+                  {de.common.date}: {item.date} • {item.selectedSlot}
                 </Text>
               </View>
-              
+
               <View style={getClientStatusBadgeStyle(item.clientStatus)}>
                 <Text style={getClientStatusTextStyle(item.clientStatus)}>
-                  {item.clientStatus.charAt(0).toUpperCase() + item.clientStatus.slice(1)}
+                  {getClientStatusLabel(item.clientStatus)}
                 </Text>
               </View>
             </TouchableOpacity>
@@ -315,57 +310,57 @@ export default function PatientsScreen() {
         <View style={styles.overlay}>
           <View style={styles.modalCard}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Patient Details</Text>
+              <Text style={styles.modalTitle}>Patientinnen-Details</Text>
               <TouchableOpacity onPress={closeDetails}>
-                <Text style={{ fontSize: 24, color: COLORS.dim, fontWeight: "800" }}>×</Text>
+                <Text style={{ fontSize: 24, color: COLORS.textSecondary, fontWeight: "800" }}>×</Text>
               </TouchableOpacity>
             </View>
 
             {selectedPatient && (
               <ScrollView style={{ maxHeight: 500 }}>
                 <View style={styles.detailSection}>
-                  <Text style={styles.sectionTitle}>Personal Information</Text>
-                  <DetailRow label="Name" value={selectedPatient.fullName} />
-                  <DetailRow label="Email" value={selectedPatient.email} />
-                  <DetailRow label="Phone" value={selectedPatient.phoneNumber} />
-                  
+                  <Text style={styles.sectionTitle}>{de.profile.personalInfo}</Text>
+                  <DetailRow label={de.common.name} value={selectedPatient.fullName} />
+                  <DetailRow label={de.common.email} value={selectedPatient.email} />
+                  <DetailRow label={de.common.phone} value={selectedPatient.phoneNumber} />
+
                   {/* Client Status */}
                   <View style={styles.detailRow}>
-                    <Text style={styles.detailLabel}>Client Status:</Text>
+                    <Text style={styles.detailLabel}>{de.common.status}:</Text>
                     <View style={getClientStatusBadgeStyle(selectedPatient.clientStatus)}>
                       <Text style={getClientStatusTextStyle(selectedPatient.clientStatus)}>
-                        {selectedPatient.clientStatus.toUpperCase()}
+                        {getClientStatusLabel(selectedPatient.clientStatus)}
                       </Text>
                     </View>
                   </View>
-                  
+
                   {/* Appointment Status */}
                   <View style={styles.detailRow}>
-                    <Text style={styles.detailLabel}>Appointment:</Text>
+                    <Text style={styles.detailLabel}>Termin:</Text>
                     <View style={getAppointmentStatusBadgeStyle(selectedPatient.status)}>
                       <Text style={getAppointmentStatusTextStyle(selectedPatient.status)}>
-                        {selectedPatient.status.toUpperCase()}
+                        {selectedPatient.status === "active" ? "Aktiv" : selectedPatient.status === "pending" ? "Ausstehend" : "Abgesagt"}
                       </Text>
                     </View>
                   </View>
                 </View>
 
                 <View style={styles.detailSection}>
-                  <Text style={styles.sectionTitle}>Insurance</Text>
-                  <DetailRow label="Number" value={selectedPatient.insuranceNumber} />
-                  <DetailRow label="Company" value={selectedPatient.insuranceCompany} />
-                  <DetailRow label="Type" value={selectedPatient.insuranceType} />
+                  <Text style={styles.sectionTitle}>Versicherung</Text>
+                  <DetailRow label="Nummer" value={selectedPatient.insuranceNumber} />
+                  <DetailRow label="Unternehmen" value={selectedPatient.insuranceCompany} />
+                  <DetailRow label="Typ" value={selectedPatient.insuranceType === "government" ? de.insurance.government : de.insurance.private} />
                 </View>
 
                 <View style={styles.detailSection}>
-                  <Text style={styles.sectionTitle}>Appointment</Text>
-                  <DetailRow label="Date" value={selectedPatient.date} />
-                  <DetailRow label="Slot" value={selectedPatient.selectedSlot} />
-                  <DetailRow label="Expected Delivery" value={selectedPatient.expectedDeliveryDate} />
+                  <Text style={styles.sectionTitle}>Termin</Text>
+                  <DetailRow label={de.common.date} value={selectedPatient.date} />
+                  <DetailRow label="Zeitfenster" value={selectedPatient.selectedSlot} />
+                  <DetailRow label={de.patients.dueDate} value={selectedPatient.expectedDeliveryDate} />
                 </View>
 
                 <View style={styles.detailSection}>
-                  <Text style={styles.sectionTitle}>Address</Text>
+                  <Text style={styles.sectionTitle}>{de.common.address}</Text>
                   <Text style={styles.addressText}>
                     {selectedPatient.selectedAddressDetails.address}
                   </Text>
@@ -377,16 +372,16 @@ export default function PatientsScreen() {
                       style={styles.actionBtn}
                       onPress={navigateToAppointments}
                     >
-                      <Text style={styles.actionBtnText}>View & Manage Appointments</Text>
+                      <Text style={styles.actionBtnText}>Termine ansehen & verwalten</Text>
                     </TouchableOpacity>
                   </View>
                 )}
               </ScrollView>
             )}
 
-            <View style={{ marginTop: 16 }}>
+            <View style={{ marginTop: SPACING.lg }}>
               <TouchableOpacity onPress={closeDetails} style={styles.closeBtn}>
-                <Text style={styles.closeBtnText}>Close</Text>
+                <Text style={styles.closeBtnText}>{de.actions.close}</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -409,14 +404,14 @@ function DetailRow({ label, value }: { label: string; value: string }) {
 // -------------------- Styles --------------------
 const styles = StyleSheet.create({
   center: { alignItems: "center", justifyContent: "center" },
-  
+
   header: {
-    paddingTop: 14,
-    paddingHorizontal: 16,
-    paddingBottom: 12,
+    paddingTop: SPACING.md,
+    paddingHorizontal: SPACING.lg,
+    paddingBottom: SPACING.md,
     backgroundColor: COLORS.card,
     borderBottomWidth: 1,
-    borderBottomColor: COLORS.line,
+    borderBottomColor: COLORS.border,
   },
   title: {
     fontSize: 24,
@@ -425,48 +420,44 @@ const styles = StyleSheet.create({
   },
   subtitle: {
     fontSize: 14,
-    color: COLORS.dim,
+    color: COLORS.textSecondary,
     marginTop: 4,
   },
 
   filterContainer: {
-    paddingVertical: 12,
-    paddingHorizontal: 16,
+    paddingVertical: SPACING.md,
+    paddingHorizontal: SPACING.lg,
     backgroundColor: COLORS.card,
     borderBottomWidth: 1,
-    borderBottomColor: COLORS.line,
+    borderBottomColor: COLORS.border,
   },
   filterBtn: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
-    backgroundColor: COLORS.bg,
-    marginRight: 8,
+    paddingHorizontal: SPACING.lg,
+    paddingVertical: SPACING.sm,
+    borderRadius: BORDER_RADIUS.full,
+    backgroundColor: COLORS.backgroundGray,
+    marginRight: SPACING.sm,
   },
   filterBtnActive: {
-    backgroundColor: COLORS.accent,
+    backgroundColor: COLORS.primary,
   },
   filterText: {
     fontSize: 14,
     fontWeight: "600",
-    color: COLORS.dim,
+    color: COLORS.textSecondary,
   },
   filterTextActive: {
-    color: COLORS.card,
+    color: COLORS.background,
   },
 
   patientCard: {
     backgroundColor: COLORS.card,
-    borderRadius: 12,
-    padding: 16,
+    borderRadius: BORDER_RADIUS.md,
+    padding: SPACING.lg,
     flexDirection: "row",
     alignItems: "center",
-    gap: 12,
-    shadowColor: "#000",
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 2,
+    gap: SPACING.md,
+    ...SHADOWS.sm,
   },
   patientName: {
     fontSize: 16,
@@ -476,44 +467,40 @@ const styles = StyleSheet.create({
   },
   patientEmail: {
     fontSize: 13,
-    color: COLORS.dim,
+    color: COLORS.textSecondary,
     marginBottom: 2,
   },
   patientPhone: {
     fontSize: 13,
-    color: COLORS.dim,
+    color: COLORS.textSecondary,
     marginBottom: 4,
   },
   patientDate: {
     fontSize: 12,
-    color: COLORS.sage,
+    color: COLORS.primary,
     fontWeight: "600",
   },
 
   overlay: {
     flex: 1,
-    backgroundColor: "rgba(0,0,0,0.5)",
+    backgroundColor: COLORS.overlay,
     justifyContent: "center",
     alignItems: "center",
-    padding: 20,
+    padding: SPACING.xl,
   },
   modalCard: {
     backgroundColor: COLORS.card,
-    borderRadius: 16,
-    padding: 20,
+    borderRadius: BORDER_RADIUS.lg,
+    padding: SPACING.xl,
     width: "100%",
     maxWidth: 500,
-    shadowColor: "#000",
-    shadowOpacity: 0.2,
-    shadowRadius: 20,
-    shadowOffset: { width: 0, height: 10 },
-    elevation: 10,
+    ...SHADOWS.lg,
   },
   modalHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: 16,
+    marginBottom: SPACING.lg,
   },
   modalTitle: {
     fontSize: 20,
@@ -522,28 +509,28 @@ const styles = StyleSheet.create({
   },
 
   detailSection: {
-    marginBottom: 16,
-    paddingBottom: 16,
+    marginBottom: SPACING.lg,
+    paddingBottom: SPACING.lg,
     borderBottomWidth: 1,
-    borderBottomColor: COLORS.line,
+    borderBottomColor: COLORS.border,
   },
   sectionTitle: {
     fontSize: 14,
     fontWeight: "700",
     color: COLORS.text,
-    marginBottom: 12,
+    marginBottom: SPACING.md,
     textTransform: "uppercase",
     letterSpacing: 0.5,
   },
   detailRow: {
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: 8,
+    marginBottom: SPACING.sm,
   },
   detailLabel: {
     fontSize: 14,
     fontWeight: "600",
-    color: COLORS.dim,
+    color: COLORS.textSecondary,
     width: 120,
   },
   detailValue: {
@@ -558,26 +545,26 @@ const styles = StyleSheet.create({
   },
 
   actionSection: {
-    marginTop: 8,
-    marginBottom: 16,
+    marginTop: SPACING.sm,
+    marginBottom: SPACING.lg,
   },
   actionBtn: {
-    backgroundColor: COLORS.accent,
-    paddingVertical: 14,
-    borderRadius: 10,
+    backgroundColor: COLORS.primary,
+    paddingVertical: SPACING.md,
+    borderRadius: BORDER_RADIUS.sm,
     alignItems: "center",
   },
   actionBtnText: {
-    color: COLORS.card,
+    color: COLORS.background,
     fontSize: 16,
     fontWeight: "700",
   },
 
   closeBtn: {
-    paddingVertical: 12,
-    borderRadius: 10,
+    paddingVertical: SPACING.md,
+    borderRadius: BORDER_RADIUS.sm,
     alignItems: "center",
-    backgroundColor: COLORS.bg,
+    backgroundColor: COLORS.backgroundGray,
   },
   closeBtnText: {
     color: COLORS.text,

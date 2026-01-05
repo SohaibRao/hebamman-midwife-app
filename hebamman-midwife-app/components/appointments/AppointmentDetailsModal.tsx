@@ -7,15 +7,8 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-
-const COLORS = {
-  bg: "#F6F8F7",
-  card: "#FFFFFF",
-  text: "#1D1D1F",
-  dim: "#5C6B63",
-  accent: "#2E5A49",
-  line: "#E5E7EB",
-};
+import { COLORS, SPACING, BORDER_RADIUS } from "@/constants/theme";
+import de from "@/constants/i18n";
 
 type UiApt = {
   serviceCode: string;
@@ -58,21 +51,21 @@ export default function AppointmentDetailsModal({
       <View style={styles.overlay}>
         <View style={styles.modalCard}>
           <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>Appointment Details</Text>
+            <Text style={styles.modalTitle}>{de.appointments.appointmentDetails}</Text>
             <TouchableOpacity onPress={onClose}>
               <Text style={styles.closeButton}>✕</Text>
             </TouchableOpacity>
           </View>
 
-          <DetailRow label="Patient" value={getPatientName(appointment.clientId)} />
-          <DetailRow label="Service" value={appointment.serviceCode} />
-          <DetailRow label="Date" value={appointment.appointmentDate} />
+          <DetailRow label={de.appointments.patientName} value={getPatientName(appointment.clientId)} />
+          <DetailRow label={de.appointments.serviceCode} value={appointment.serviceCode} />
+          <DetailRow label={de.common.date} value={appointment.appointmentDate} />
           <DetailRow
-            label="Time"
+            label={de.common.time}
             value={`${appointment.startTime}–${appointment.endTime}`}
           />
-          <DetailRow label="Duration" value={`${appointment.duration} min`} />
-          <DetailRow label="Status" value={appointment.status ?? "—"} />
+          <DetailRow label={de.appointments.duration} value={`${appointment.duration} ${de.appointments.minutes}`} />
+          <DetailRow label={de.common.status} value={appointment.status ?? "—"} />
 
           {isCancelled ? (
             <View style={styles.buttonRow}>
@@ -83,10 +76,10 @@ export default function AppointmentDetailsModal({
                 }}
                 style={[styles.primaryButton, styles.reactivateButton]}
               >
-                <Text style={styles.primaryButtonText}>Reactivate</Text>
+                <Text style={styles.primaryButtonText}>{de.appointments.reactivateAppointment}</Text>
               </TouchableOpacity>
               <TouchableOpacity onPress={onClose} style={styles.secondaryButton}>
-                <Text style={styles.secondaryButtonText}>Close</Text>
+                <Text style={styles.secondaryButtonText}>{de.actions.close}</Text>
               </TouchableOpacity>
             </View>
           ) : (
@@ -98,7 +91,7 @@ export default function AppointmentDetailsModal({
                 }}
                 style={styles.primaryButton}
               >
-                <Text style={styles.primaryButtonText}>Edit</Text>
+                <Text style={styles.primaryButtonText}>{de.actions.edit}</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 onPress={() => {
@@ -107,7 +100,7 @@ export default function AppointmentDetailsModal({
                 }}
                 style={styles.cancelButton}
               >
-                <Text style={styles.cancelButtonText}>Cancel</Text>
+                <Text style={styles.cancelButtonText}>{de.actions.cancel}</Text>
               </TouchableOpacity>
             </View>
           )}
@@ -132,12 +125,12 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(0,0,0,.25)",
     alignItems: "center",
     justifyContent: "center",
-    padding: 20,
+    padding: SPACING.lg,
   },
   modalCard: {
     backgroundColor: COLORS.card,
-    borderRadius: 12,
-    padding: 18,
+    borderRadius: BORDER_RADIUS.lg,
+    padding: SPACING.lg,
     width: "100%",
     maxWidth: 400,
     shadowColor: "#000",
@@ -150,7 +143,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: 6,
+    marginBottom: SPACING.md,
   },
   modalTitle: {
     fontSize: 18,
@@ -159,16 +152,16 @@ const styles = StyleSheet.create({
   },
   closeButton: {
     fontWeight: "800",
-    color: COLORS.dim,
+    color: COLORS.textSecondary,
     fontSize: 18,
   },
   detailRow: {
     flexDirection: "row",
-    marginTop: 8,
+    marginTop: SPACING.sm,
   },
   detailLabel: {
     width: 110,
-    color: COLORS.dim,
+    color: COLORS.textSecondary,
     fontWeight: "700",
   },
   detailValue: {
@@ -177,48 +170,48 @@ const styles = StyleSheet.create({
   },
   buttonRow: {
     flexDirection: "row",
-    marginTop: 14,
-    gap: 10,
+    marginTop: SPACING.lg,
+    gap: SPACING.sm,
   },
   primaryButton: {
     flex: 1,
-    backgroundColor: COLORS.accent,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderRadius: 10,
+    backgroundColor: COLORS.primary,
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.sm,
+    borderRadius: BORDER_RADIUS.md,
     alignItems: "center",
   },
   primaryButtonText: {
-    color: "white",
+    color: COLORS.background,
     fontWeight: "800",
   },
   reactivateButton: {
-    backgroundColor: "#16a34a",
+    backgroundColor: COLORS.success,
   },
   secondaryButton: {
     flex: 1,
     borderWidth: 1,
-    borderColor: COLORS.accent,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderRadius: 10,
+    borderColor: COLORS.primary,
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.sm,
+    borderRadius: BORDER_RADIUS.md,
     backgroundColor: "transparent",
     alignItems: "center",
   },
   secondaryButtonText: {
-    color: COLORS.accent,
+    color: COLORS.primary,
     fontWeight: "800",
   },
   cancelButton: {
     flex: 1,
-    backgroundColor: "#DC2626",
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderRadius: 10,
+    backgroundColor: COLORS.error,
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.sm,
+    borderRadius: BORDER_RADIUS.md,
     alignItems: "center",
   },
   cancelButtonText: {
-    color: "white",
+    color: COLORS.background,
     fontWeight: "800",
   },
 });

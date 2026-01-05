@@ -9,15 +9,8 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-
-const COLORS = {
-  bg: "#F6F8F7",
-  card: "#FFFFFF",
-  text: "#1D1D1F",
-  dim: "#5C6B63",
-  accent: "#2E5A49",
-  line: "#E5E7EB",
-};
+import { COLORS, SPACING, BORDER_RADIUS } from "@/constants/theme";
+import de from "@/constants/i18n";
 
 type UiApt = {
   serviceCode: string;
@@ -59,7 +52,7 @@ const sameDay = (a: Date, b: Date) =>
   a.getMonth() === b.getMonth() &&
   a.getDate() === b.getDate();
 const fmtDateShort = (d: Date) =>
-  d.toLocaleDateString(undefined, { weekday: "short", day: "2-digit", month: "short" });
+  d.toLocaleDateString('de-DE', { weekday: "short", day: "2-digit", month: "short" });
 
 export default function ReactivateAppointmentModal({
   visible,
@@ -85,7 +78,7 @@ export default function ReactivateAppointmentModal({
         <View style={styles.modalCard}>
           <View style={styles.modalHeader}>
             <Text style={styles.modalTitle}>
-              Reactivate & Reschedule {appointment.serviceCode}
+              {de.appointments.reactivateAppointment} {appointment.serviceCode}
             </Text>
             <TouchableOpacity onPress={onClose}>
               <Text style={styles.closeButton}>✕</Text>
@@ -93,13 +86,13 @@ export default function ReactivateAppointmentModal({
           </View>
 
           {!timetable ? (
-            <Text style={styles.errorText}>No timetable found for this midwife.</Text>
+            <Text style={styles.errorText}>Kein Zeitplan für diese Hebamme gefunden.</Text>
           ) : (
             <ScrollView showsVerticalScrollIndicator={false} style={styles.scrollView}>
               {/* Info Box */}
               <View style={styles.infoBox}>
                 <Text style={styles.infoText}>
-                  Select a new date and time to reactivate this appointment
+                  Wählen Sie ein neues Datum und eine neue Uhrzeit, um diesen Termin zu reaktivieren
                 </Text>
               </View>
 
@@ -116,7 +109,7 @@ export default function ReactivateAppointmentModal({
                   <Text style={styles.navButtonText}>◀</Text>
                 </TouchableOpacity>
                 <Text style={styles.monthTitle}>
-                  {calendarMonth.toLocaleDateString(undefined, {
+                  {calendarMonth.toLocaleDateString('de-DE', {
                     month: "long",
                     year: "numeric",
                   })}
@@ -135,7 +128,7 @@ export default function ReactivateAppointmentModal({
 
               {/* Week Header */}
               <View style={styles.weekHeader}>
-                {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((d) => (
+                {["So", "Mo", "Di", "Mi", "Do", "Fr", "Sa"].map((d) => (
                   <Text key={d} style={styles.weekHeaderText}>
                     {d}
                   </Text>
@@ -154,13 +147,13 @@ export default function ReactivateAppointmentModal({
               <View style={styles.slotsSection}>
                 <Text style={styles.slotsTitle}>
                   {selectedDate
-                    ? `Available slots on ${fmtDateShort(selectedDate)}`
-                    : "Select a date"}
+                    ? `Verfügbare Slots am ${fmtDateShort(selectedDate)}`
+                    : "Wählen Sie ein Datum"}
                 </Text>
                 {!selectedDate ? (
-                  <Text style={styles.helperText}>Pick a date to see available slots.</Text>
+                  <Text style={styles.helperText}>Wählen Sie ein Datum, um verfügbare Slots anzuzeigen.</Text>
                 ) : availableSlots.length === 0 ? (
-                  <Text style={styles.helperText}>No free slots on this date.</Text>
+                  <Text style={styles.helperText}>Keine freien Slots an diesem Datum.</Text>
                 ) : (
                   <View style={styles.slotsList}>
                     {availableSlots.map((s) => {
@@ -191,7 +184,7 @@ export default function ReactivateAppointmentModal({
                   disabled={isReactivating}
                   style={styles.secondaryButton}
                 >
-                  <Text style={styles.secondaryButtonText}>Cancel</Text>
+                  <Text style={styles.secondaryButtonText}>{de.actions.cancel}</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                   onPress={onReactivate}
@@ -205,7 +198,7 @@ export default function ReactivateAppointmentModal({
                   {isReactivating ? (
                     <ActivityIndicator color="white" size="small" />
                   ) : (
-                    <Text style={styles.reactivateButtonText}>Reactivate</Text>
+                    <Text style={styles.reactivateButtonText}>Reaktivieren</Text>
                   )}
                 </TouchableOpacity>
               </View>
@@ -275,12 +268,12 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(0,0,0,.25)",
     alignItems: "center",
     justifyContent: "center",
-    padding: 20,
+    padding: SPACING.lg,
   },
   modalCard: {
     backgroundColor: COLORS.card,
-    borderRadius: 12,
-    padding: 18,
+    borderRadius: BORDER_RADIUS.lg,
+    padding: SPACING.lg,
     width: "100%",
     maxWidth: 400,
     maxHeight: "90%",
@@ -294,7 +287,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: 12,
+    marginBottom: SPACING.md,
   },
   modalTitle: {
     fontSize: 18,
@@ -303,24 +296,24 @@ const styles = StyleSheet.create({
   },
   closeButton: {
     fontWeight: "800",
-    color: COLORS.dim,
+    color: COLORS.textSecondary,
     fontSize: 20,
   },
   errorText: {
-    color: "crimson",
-    padding: 12,
+    color: COLORS.error,
+    padding: SPACING.md,
   },
   scrollView: {
     maxHeight: 600,
   },
   infoBox: {
-    backgroundColor: "#DBEAFE",
-    padding: 12,
-    borderRadius: 8,
-    marginBottom: 16,
+    backgroundColor: COLORS.infoLight,
+    padding: SPACING.md,
+    borderRadius: BORDER_RADIUS.sm,
+    marginBottom: SPACING.lg,
   },
   infoText: {
-    color: "#1E40AF",
+    color: COLORS.info,
     fontSize: 13,
     fontWeight: "600",
   },
@@ -328,14 +321,14 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingVertical: 10,
-    marginBottom: 8,
+    paddingVertical: SPACING.sm,
+    marginBottom: SPACING.sm,
   },
   navButton: {
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 8,
-    backgroundColor: "#EEF3F1",
+    paddingHorizontal: SPACING.sm,
+    paddingVertical: SPACING.xs,
+    borderRadius: BORDER_RADIUS.sm,
+    backgroundColor: COLORS.backgroundGray,
   },
   navButtonText: {
     color: COLORS.text,
@@ -348,10 +341,10 @@ const styles = StyleSheet.create({
   },
   weekHeader: {
     flexDirection: "row",
-    paddingBottom: 6,
+    paddingBottom: SPACING.xs,
   },
   weekHeaderText: {
-    color: COLORS.dim,
+    color: COLORS.textSecondary,
     fontWeight: "700",
     textAlign: "center",
     width: "14.28%",
@@ -360,14 +353,14 @@ const styles = StyleSheet.create({
   grid: {
     flexDirection: "row",
     flexWrap: "wrap",
-    paddingBottom: 10,
+    paddingBottom: SPACING.sm,
   },
   gridCell: {
     width: "14.28%",
     aspectRatio: 1,
-    borderRadius: 8,
-    backgroundColor: "#F4F6F5",
-    padding: 4,
+    borderRadius: BORDER_RADIUS.sm,
+    backgroundColor: COLORS.backgroundGray,
+    padding: SPACING.xs,
     justifyContent: "center",
     alignItems: "center",
     marginBottom: 2,
@@ -376,7 +369,7 @@ const styles = StyleSheet.create({
     opacity: 0.3,
   },
   gridCellSelected: {
-    backgroundColor: "#E7ECEA",
+    backgroundColor: COLORS.primaryLight,
   },
   gridDay: {
     fontWeight: "800",
@@ -387,34 +380,34 @@ const styles = StyleSheet.create({
     fontWeight: "800",
   },
   slotsSection: {
-    marginTop: 16,
-    paddingBottom: 12,
+    marginTop: SPACING.lg,
+    paddingBottom: SPACING.md,
   },
   slotsTitle: {
     fontSize: 16,
     fontWeight: "800",
     color: COLORS.text,
-    marginBottom: 10,
+    marginBottom: SPACING.sm,
   },
   helperText: {
-    color: COLORS.dim,
+    color: COLORS.textSecondary,
     fontSize: 13,
   },
   slotsList: {
-    gap: 8,
+    gap: SPACING.sm,
   },
   slotCard: {
-    backgroundColor: "#F4F6F5",
-    borderRadius: 10,
+    backgroundColor: COLORS.backgroundGray,
+    borderRadius: BORDER_RADIUS.md,
     borderWidth: 1,
-    borderColor: COLORS.line,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
+    borderColor: COLORS.border,
+    paddingVertical: SPACING.md,
+    paddingHorizontal: SPACING.lg,
     alignItems: "center",
   },
   slotCardActive: {
-    backgroundColor: COLORS.accent,
-    borderColor: COLORS.accent,
+    backgroundColor: COLORS.primary,
+    borderColor: COLORS.primary,
   },
   slotText: {
     color: COLORS.text,
@@ -422,38 +415,38 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
   slotTextActive: {
-    color: "white",
+    color: COLORS.background,
   },
   buttonRow: {
     flexDirection: "row",
-    gap: 10,
-    marginTop: 16,
+    gap: SPACING.sm,
+    marginTop: SPACING.lg,
   },
   secondaryButton: {
     flex: 1,
     borderWidth: 1,
-    borderColor: COLORS.accent,
-    paddingVertical: 12,
-    borderRadius: 10,
+    borderColor: COLORS.primary,
+    paddingVertical: SPACING.md,
+    borderRadius: BORDER_RADIUS.md,
     backgroundColor: "transparent",
     alignItems: "center",
   },
   secondaryButtonText: {
-    color: COLORS.accent,
+    color: COLORS.primary,
     fontWeight: "800",
   },
   reactivateButton: {
     flex: 1,
-    backgroundColor: "#16a34a",
-    paddingVertical: 12,
-    borderRadius: 10,
+    backgroundColor: COLORS.success,
+    paddingVertical: SPACING.md,
+    borderRadius: BORDER_RADIUS.md,
     alignItems: "center",
   },
   reactivateButtonDisabled: {
     opacity: 0.6,
   },
   reactivateButtonText: {
-    color: "white",
+    color: COLORS.background,
     fontSize: 15,
     fontWeight: "800",
   },

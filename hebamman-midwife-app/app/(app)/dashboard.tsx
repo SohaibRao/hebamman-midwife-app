@@ -16,48 +16,35 @@ import {
 import { Lead, leadAddress, leadDisplayDate, useLeads } from "@/hooks/useLeads";
 import { useMidwifeProfile } from "@/hooks/useMidwifeProfile";
 import { api } from "@/lib/api";
-
-const COLORS = {
-  bg: "#F6F8F7",
-  card: "#FFFFFF",
-  text: "#1D1D1F",
-  dim: "#5C6B63",
-  accent: "#2E5A49",
-  sage: "#7F9086",
-  badgePending: "#EAB308",
-  badgeDone: "#22C55E",
-  badgeGray: "#9CA3AF",
-  line: "#E5E7EB",
-  adminBanner: "#3B82F6",
-  adminBannerLight: "#EFF6FF",
-};
+import { COLORS, SPACING, BORDER_RADIUS, SHADOWS } from "@/constants/theme";
+import de from "@/constants/i18n";
 
 // Service colors
 const SERVICE_COLORS: Record<string, string> = {
-  "A1/A2": "#7c3aed",
-  B1: "#2563eb",
-  B2: "#0ea5e9",
-  E1: "#f59e0b",
-  C1: "#16a34a",
-  C2: "#10b981",
-  D1: "#ef4444",
-  D2: "#f97316",
-  F1: "#a855f7",
+  "A1/A2": COLORS.serviceA1A2,
+  B1: COLORS.serviceB1,
+  B2: COLORS.serviceB2,
+  E1: COLORS.serviceE1,
+  C1: COLORS.serviceC1,
+  C2: COLORS.serviceC2,
+  D1: COLORS.serviceD1,
+  D2: COLORS.serviceD2,
+  F1: COLORS.serviceF1,
 };
 
 const SERVICE_NAMES: Record<string, string> = {
-  "A1/A2": "Initial Consultation",
-  B1: "Pre Birth Visit",
-  B2: "Pre Birth Video",
-  E1: "Birth Training",
-  C1: "Early Care Visit",
-  C2: "Early Care Video",
-  D1: "Late Care Visit",
-  D2: "Late Care Video",
-  F1: "After Birth Gym",
+  "A1/A2": de.serviceCodes["A1/A2"],
+  B1: de.serviceCodes.B1,
+  B2: de.serviceCodes.B2,
+  E1: de.serviceCodes.E1,
+  C1: de.serviceCodes.C1,
+  C2: de.serviceCodes.C2,
+  D1: de.serviceCodes.D1,
+  D2: de.serviceCodes.D2,
+  F1: de.serviceCodes.F1,
 };
 
-const codeColor = (code: string) => SERVICE_COLORS[code] ?? COLORS.sage;
+const codeColor = (code: string) => SERVICE_COLORS[code] ?? COLORS.textSecondary;
 
 // Types
 type Patient = {
@@ -347,67 +334,130 @@ export default function Dashboard() {
     return user?.username ?? "Midwife";
   };
 
+  // Get today's date in German format
+  const getTodayDate = () => {
+    const now = new Date();
+    const day = now.toLocaleDateString('de-DE', { weekday: 'long' });
+    const date = now.toLocaleDateString('de-DE', { day: '2-digit', month: 'long', year: 'numeric' });
+    return `${day.charAt(0).toUpperCase() + day.slice(1)}, ${date}`;
+  };
+
   return (
-    <ScrollView style={{ flex: 1, backgroundColor: COLORS.bg }} contentContainerStyle={{ padding: 16 }}>
+    <ScrollView style={{ flex: 1, backgroundColor: COLORS.background }} contentContainerStyle={{ padding: SPACING.lg }}>
       {/* Admin Banner - Show when superuser is managing a midwife */}
       {isSuperuser && isManagingMidwife && (
         <View style={styles.adminBanner}>
           <View style={styles.adminBannerContent}>
             <View style={styles.adminBannerLeft}>
-              <Text style={styles.adminBannerLabel}>Admin Mode</Text>
-              <Text style={styles.adminBannerName}>
-                Managing: {selectedMidwife?.name}
-              </Text>
+              <Text style={styles.adminBannerLabel}>{de.admin.managingPracticeOf}</Text>
+              <Text style={styles.adminBannerName}>{selectedMidwife?.name}</Text>
             </View>
-            <TouchableOpacity 
+            <TouchableOpacity
               style={styles.switchMidwifeBtn}
               onPress={handleSwitchMidwife}
             >
-              <Text style={styles.switchMidwifeBtnText}>Switch</Text>
+              <Text style={styles.switchMidwifeBtnText}>{de.dashboard.switchBack}</Text>
             </TouchableOpacity>
           </View>
         </View>
       )}
 
-      {/* Welcome */}
-      <View style={{ marginBottom: 8 }}>
+      {/* Greeting */}
+      <View style={{ marginBottom: SPACING.lg }}>
         <Text style={styles.h1}>
-          {isSuperuser && isManagingMidwife 
-            ? `Dashboard: ${selectedMidwife?.name}` 
-            : `Welcome, ${getWelcomeName()}`}
+          {de.dashboard.greeting}, {getWelcomeName()}
         </Text>
-        <Text style={styles.sub}>
-          {isSuperuser && isManagingMidwife 
-            ? "You're viewing this midwife's dashboard as admin."
-            : "Manage your patients & schedule at a glance."}
-        </Text>
+        <Text style={styles.dateText}>{getTodayDate()}</Text>
       </View>
 
-      {/* Stat: Active Patients */}
-      <View style={styles.statCard}>
-        <Text style={styles.statLabel}>Active Patients</Text>
-        {loadingPatients ? (
-          <ActivityIndicator size="large" color={COLORS.accent} style={{ marginTop: 8 }} />
-        ) : (
-          <Text style={styles.statValue}>{activePatientsCount}</Text>
-        )}
+      {/* Stats Grid */}
+      <View style={styles.statsGrid}>
+        <View style={[styles.statCard, { backgroundColor: COLORS.primaryLight }]}>
+          <Text style={styles.statIcon}>👥</Text>
+          {loadingPatients ? (
+            <ActivityIndicator size="small" color={COLORS.primary} style={{ marginTop: 8 }} />
+          ) : (
+            <Text style={styles.statValue}>{activePatientsCount}</Text>
+          )}
+          <Text style={styles.statLabel}>{de.dashboard.stats.activePatients}</Text>
+        </View>
+
+        <View style={[styles.statCard, { backgroundColor: COLORS.infoLight }]}>
+          <Text style={styles.statIcon}>📋</Text>
+          <Text style={styles.statValue}>0</Text>
+          <Text style={styles.statLabel}>{de.dashboard.stats.openRequests}</Text>
+        </View>
+
+        <View style={[styles.statCard, { backgroundColor: COLORS.successLight }]}>
+          <Text style={styles.statIcon}>👶</Text>
+          <Text style={styles.statValue}>0</Text>
+          <Text style={styles.statLabel}>{de.dashboard.stats.birthsThisMonth}</Text>
+        </View>
+
+        <View style={[styles.statCard, { backgroundColor: COLORS.warningLight }]}>
+          <Text style={styles.statIcon}>📅</Text>
+          {loadingAppointments ? (
+            <ActivityIndicator size="small" color={COLORS.primary} style={{ marginTop: 8 }} />
+          ) : (
+            <Text style={styles.statValue}>{upcomingApp5.length}</Text>
+          )}
+          <Text style={styles.statLabel}>{de.dashboard.stats.appointmentsToday}</Text>
+        </View>
       </View>
 
-      {/* A1/A2 Consultation (Leads) - Unchanged */}
+      {/* Today's Appointments */}
       <SectionHeader
-        title="A1/A2 Consultation (Leads)"
+        title={de.dashboard.todaysAppointments}
         action={
-          <Link href={{ pathname: "/(app)/leads" } as any} asChild>
+          <Link href={{ pathname: "/(app)/appointments" } as any} asChild>
             <TouchableOpacity style={styles.linkBtn}>
-              <Text style={styles.linkBtnText}>See all leads</Text>
+              <Text style={styles.linkBtnText}>{de.dashboard.viewAll}</Text>
             </TouchableOpacity>
           </Link>
         }
       />
       <View style={styles.listCard}>
-        {leadsLoading && <Text style={{ color: COLORS.dim }}>Loading…</Text>}
+        {loadingAppointments && (
+          <View style={{ paddingVertical: 20, alignItems: "center" }}>
+            <ActivityIndicator size="small" color={COLORS.primary} />
+          </View>
+        )}
+        {!loadingAppointments && upcomingApp5.length === 0 && (
+          <Text style={{ color: COLORS.textSecondary, paddingVertical: 12 }}>{de.dashboard.noAppointments}</Text>
+        )}
+        {!loadingAppointments &&
+          upcomingApp5.map((a, i) => (
+            <View key={`${a.serviceCode}-${a.appointmentId}`} style={[styles.row, i > 0 && styles.rowDivider]}>
+              <View style={[styles.dot, { backgroundColor: codeColor(a.serviceCode) }]} />
+              <View style={{ flex: 1 }}>
+                <Text style={styles.rowTitle}>
+                  {a.serviceCode} • {SERVICE_NAMES[a.serviceCode] || a.serviceCode}
+                </Text>
+                <Text style={styles.rowSub}>{a.clientName || "Patient"}</Text>
+              </View>
+              <View style={{ alignItems: "flex-end" }}>
+                <Text style={styles.when}>{fmtDateShort(a.dateObj)}</Text>
+                <Text style={styles.slot}>{a.startTime}–{a.endTime} · {a.duration}{de.appointments.minutes}</Text>
+              </View>
+            </View>
+          ))}
+      </View>
+
+      {/* A1/A2 Consultation (Leads) */}
+      <SectionHeader
+        title="A1/A2 Beratungen (Leads)"
+        action={
+          <Link href={{ pathname: "/(app)/leads" } as any} asChild>
+            <TouchableOpacity style={styles.linkBtn}>
+              <Text style={styles.linkBtnText}>{de.dashboard.viewAll}</Text>
+            </TouchableOpacity>
+          </Link>
+        }
+      />
+      <View style={styles.listCard}>
+        {leadsLoading && <Text style={{ color: COLORS.textSecondary }}>{de.common.loading}</Text>}
         {!leadsLoading && upcomingLeads5.length === 0 && (
-          <Text style={{ color: COLORS.dim }}>No upcoming leads.</Text>
+          <Text style={{ color: COLORS.textSecondary }}>Keine bevorstehenden Leads.</Text>
         )}
         {!leadsLoading &&
           upcomingLeads5.map((lead, i) => (
@@ -429,51 +479,13 @@ export default function Dashboard() {
           ))}
       </View>
 
-      {/* Upcoming Appointments - Real Data */}
+      {/* Active Patients (Latest 5) */}
       <SectionHeader
-        title="Upcoming Appointments"
-        action={
-          <Link href={{ pathname: "/(app)/appointments" } as any} asChild>
-            <TouchableOpacity style={styles.linkBtn}>
-              <Text style={styles.linkBtnText}>See all appointments</Text>
-            </TouchableOpacity>
-          </Link>
-        }
-      />
-      <View style={styles.listCard}>
-        {loadingAppointments && (
-          <View style={{ paddingVertical: 20, alignItems: "center" }}>
-            <ActivityIndicator size="small" color={COLORS.accent} />
-          </View>
-        )}
-        {!loadingAppointments && upcomingApp5.length === 0 && (
-          <Text style={{ color: COLORS.dim, paddingVertical: 12 }}>No upcoming appointments.</Text>
-        )}
-        {!loadingAppointments &&
-          upcomingApp5.map((a, i) => (
-            <View key={`${a.serviceCode}-${a.appointmentId}`} style={[styles.row, i > 0 && styles.rowDivider]}>
-              <View style={[styles.dot, { backgroundColor: codeColor(a.serviceCode) }]} />
-              <View style={{ flex: 1 }}>
-                <Text style={styles.rowTitle}>
-                  {a.serviceCode} • {SERVICE_NAMES[a.serviceCode] || a.serviceCode}
-                </Text>
-                <Text style={styles.rowSub}>{a.clientName || "Patient"}</Text>
-              </View>
-              <View style={{ alignItems: "flex-end" }}>
-                <Text style={styles.when}>{fmtDateShort(a.dateObj)}</Text>
-                <Text style={styles.slot}>{a.startTime}–{a.endTime} · {a.duration}m</Text>
-              </View>
-            </View>
-          ))}
-      </View>
-
-      {/* Active Patients (Latest 5) - Replaces Requests */}
-      <SectionHeader
-        title="Active Patients"
+        title={de.patients.title}
         action={
           <Link href={{ pathname: "/(app)/patients" } as any} asChild>
             <TouchableOpacity style={styles.linkBtn}>
-              <Text style={styles.linkBtnText}>View all patients</Text>
+              <Text style={styles.linkBtnText}>{de.dashboard.viewAll}</Text>
             </TouchableOpacity>
           </Link>
         }
@@ -481,17 +493,16 @@ export default function Dashboard() {
       <View style={styles.listCard}>
         {loadingPatients && (
           <View style={{ paddingVertical: 20, alignItems: "center" }}>
-            <ActivityIndicator size="small" color={COLORS.accent} />
+            <ActivityIndicator size="small" color={COLORS.primary} />
           </View>
         )}
         {!loadingPatients && activePatients5.length === 0 && (
-          <Text style={{ color: COLORS.dim, paddingVertical: 12 }}>No active patients.</Text>
+          <Text style={{ color: COLORS.textSecondary, paddingVertical: 12 }}>{de.patients.noPatients}</Text>
         )}
         {!loadingPatients &&
           activePatients5.map((patient, i) => (
             <TouchableOpacity
               key={patient._id}
-              
               style={[styles.row, i > 0 && styles.rowDivider]}
             >
               <View style={{ flex: 1 }}>
@@ -501,17 +512,37 @@ export default function Dashboard() {
               </View>
               <View style={{ alignItems: "flex-end" }}>
                 <View style={styles.badge}>
-                  <Text style={styles.badgeText}>Active</Text>
+                  <Text style={styles.badgeText}>{de.patients.status.schwanger}</Text>
                 </View>
               </View>
             </TouchableOpacity>
           ))}
       </View>
 
-      {/* Logout Button */}
-      <TouchableOpacity style={styles.logout} onPress={logout}>
-        <Text style={styles.logoutText}>Logout</Text>
-      </TouchableOpacity>
+      {/* Quick Actions */}
+      <View style={{ marginTop: SPACING.lg }}>
+        <Text style={styles.sectionTitle}>{de.dashboard.quickActions}</Text>
+        <View style={styles.quickActionsGrid}>
+          <Link href={{ pathname: "/(app)/appointments" } as any} asChild>
+            <TouchableOpacity style={styles.quickActionBtn}>
+              <Text style={styles.quickActionIcon}>📅</Text>
+              <Text style={styles.quickActionText}>{de.dashboard.quickActionButtons.createAppointment}</Text>
+            </TouchableOpacity>
+          </Link>
+          <Link href={{ pathname: "/(app)/patients" } as any} asChild>
+            <TouchableOpacity style={styles.quickActionBtn}>
+              <Text style={styles.quickActionIcon}>👤</Text>
+              <Text style={styles.quickActionText}>{de.dashboard.quickActionButtons.addPatient}</Text>
+            </TouchableOpacity>
+          </Link>
+          <Link href={{ pathname: "/(app)/requests" } as any} asChild>
+            <TouchableOpacity style={styles.quickActionBtn}>
+              <Text style={styles.quickActionIcon}>📋</Text>
+              <Text style={styles.quickActionText}>{de.dashboard.quickActionButtons.checkRequests}</Text>
+            </TouchableOpacity>
+          </Link>
+        </View>
+      </View>
 
       {/* Lead details modal */}
       {selectedLead && (
@@ -519,19 +550,19 @@ export default function Dashboard() {
           <Pressable style={styles.overlay} onPress={() => setSelectedLead(null)}>
             <Pressable style={styles.modalCard}>
               <View style={styles.modalHeader}>
-                <Text style={styles.modalTitle}>Lead Details</Text>
+                <Text style={styles.modalTitle}>Lead-Details</Text>
                 <TouchableOpacity onPress={() => setSelectedLead(null)}>
-                  <Text style={{ fontWeight: "700", color: COLORS.dim }}>✕</Text>
+                  <Text style={{ fontWeight: "700", color: COLORS.textSecondary }}>✕</Text>
                 </TouchableOpacity>
               </View>
-              <Detail label="Name" value={selectedLead.fullName} />
-              <Detail label="Email" value={selectedLead.email} />
-              <Detail label="Phone" value={selectedLead.phoneNumber} />
-              <Detail label="Date" value={leadDisplayDate(selectedLead)} />
-              <Detail label="Slot" value={selectedLead.selectedSlot ?? "—"} />
-              <Detail label="Insurance" value={`${selectedLead.insuranceType ?? "—"} (${selectedLead.insuranceCompany ?? "—"})`} />
-              <Detail label="Address" value={leadAddress(selectedLead)} />
-              <Detail label="Status" value={selectedLead.status ?? "pending"} />
+              <Detail label={de.common.name} value={selectedLead.fullName} />
+              <Detail label={de.common.email} value={selectedLead.email} />
+              <Detail label={de.common.phone} value={selectedLead.phoneNumber} />
+              <Detail label={de.common.date} value={leadDisplayDate(selectedLead)} />
+              <Detail label="Zeitfenster" value={selectedLead.selectedSlot ?? "—"} />
+              <Detail label="Versicherung" value={`${selectedLead.insuranceType ?? "—"} (${selectedLead.insuranceCompany ?? "—"})`} />
+              <Detail label={de.common.address} value={leadAddress(selectedLead)} />
+              <Detail label={de.common.status} value={selectedLead.status ?? "pending"} />
             </Pressable>
           </Pressable>
         </Modal>
@@ -551,8 +582,8 @@ function SectionHeader({ title, action }: { title: string; action?: React.ReactN
 
 function Detail({ label, value }: { label: string; value?: string }) {
   return (
-    <View style={{ flexDirection: "row", marginTop: 8 }}>
-      <Text style={{ width: 110, color: COLORS.dim, fontWeight: "700" }}>{label}:</Text>
+    <View style={{ flexDirection: "row", marginTop: SPACING.sm }}>
+      <Text style={{ width: 110, color: COLORS.textSecondary, fontWeight: "700" }}>{label}:</Text>
       <Text style={{ flex: 1, color: COLORS.text }}>{value ?? "—"}</Text>
     </View>
   );
@@ -561,12 +592,12 @@ function Detail({ label, value }: { label: string; value?: string }) {
 const styles = StyleSheet.create({
   // Admin Banner Styles
   adminBanner: {
-    backgroundColor: COLORS.adminBannerLight,
-    borderRadius: 12,
-    padding: 12,
-    marginBottom: 16,
+    backgroundColor: COLORS.infoLight,
+    borderRadius: BORDER_RADIUS.md,
+    padding: SPACING.md,
+    marginBottom: SPACING.lg,
     borderLeftWidth: 4,
-    borderLeftColor: COLORS.adminBanner,
+    borderLeftColor: COLORS.info,
   },
   adminBannerContent: {
     flexDirection: "row",
@@ -579,7 +610,7 @@ const styles = StyleSheet.create({
   adminBannerLabel: {
     fontSize: 12,
     fontWeight: "700",
-    color: COLORS.adminBanner,
+    color: COLORS.info,
     textTransform: "uppercase",
     letterSpacing: 0.5,
   },
@@ -590,144 +621,203 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   switchMidwifeBtn: {
-    backgroundColor: COLORS.adminBanner,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 8,
+    backgroundColor: COLORS.info,
+    paddingHorizontal: SPACING.lg,
+    paddingVertical: SPACING.sm,
+    borderRadius: BORDER_RADIUS.sm,
   },
   switchMidwifeBtnText: {
-    color: "#FFFFFF",
+    color: COLORS.background,
     fontWeight: "700",
     fontSize: 14,
   },
-  
+
   h1: {
-    fontSize: 24,
+    fontSize: 28,
     fontWeight: "800",
     color: COLORS.text,
   },
-  sub: { color: COLORS.dim, marginTop: 4 },
+  dateText: {
+    color: COLORS.textSecondary,
+    marginTop: 4,
+    fontSize: 14,
+  },
 
+  // Stats Grid
+  statsGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: SPACING.md,
+    marginBottom: SPACING.xl,
+  },
   statCard: {
     backgroundColor: COLORS.card,
-    borderRadius: 16,
-    padding: 16,
-    marginTop: 10,
-    marginBottom: 14,
-    shadowColor: "#000",
-    shadowOpacity: 0.06,
-    shadowRadius: 10,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 2,
+    borderRadius: BORDER_RADIUS.md,
+    padding: SPACING.lg,
+    flex: 1,
+    minWidth: '47%',
+    alignItems: "center",
+    ...SHADOWS.sm,
   },
-  statLabel: { color: COLORS.dim, fontWeight: "600" },
-  statValue: { fontSize: 36, fontWeight: "900", color: COLORS.accent, marginTop: 6 },
+  statIcon: {
+    fontSize: 32,
+    marginBottom: SPACING.sm,
+  },
+  statValue: {
+    fontSize: 32,
+    fontWeight: "800",
+    color: COLORS.text,
+    marginVertical: SPACING.xs,
+  },
+  statLabel: {
+    color: COLORS.textSecondary,
+    fontWeight: "600",
+    fontSize: 12,
+    textAlign: "center",
+  },
 
   sectionHeader: {
-    paddingTop: 6,
-    paddingBottom: 8,
+    paddingTop: SPACING.sm,
+    paddingBottom: SPACING.sm,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
+    marginTop: SPACING.md,
   },
-  sectionTitle: { fontSize: 18, fontWeight: "800", color: COLORS.text },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: "800",
+    color: COLORS.text,
+  },
 
   linkBtn: {
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 10,
-    backgroundColor: COLORS.accent,
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.sm,
+    borderRadius: BORDER_RADIUS.sm,
+    backgroundColor: COLORS.primary,
   },
-  linkBtnText: { color: "white", fontWeight: "700" },
-
-  linkBtnSecondary: {
-    paddingVertical: 14,
-    borderRadius: 14,
-    alignItems: "center",
-    borderWidth: 1,
-    borderColor: COLORS.accent,
-    marginTop: 8,
+  linkBtnText: {
+    color: COLORS.background,
+    fontWeight: "700",
+    fontSize: 13,
   },
-  linkBtnSecondaryText: { color: COLORS.accent, fontWeight: "700" },
 
   listCard: {
     backgroundColor: COLORS.card,
-    borderRadius: 16,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    shadowColor: "#000",
-    shadowOpacity: 0.06,
-    shadowRadius: 10,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 2,
-    marginBottom: 16,
+    borderRadius: BORDER_RADIUS.md,
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.sm,
+    ...SHADOWS.sm,
+    marginBottom: SPACING.lg,
   },
 
   row: {
     flexDirection: "row",
     alignItems: "center",
-    paddingVertical: 12,
-    gap: 10,
+    paddingVertical: SPACING.md,
+    gap: SPACING.sm,
   },
   rowDivider: {
     borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: COLORS.line,
+    borderTopColor: COLORS.border,
   },
-  rowTitle: { fontWeight: "700", color: COLORS.text },
-  rowSub: { color: COLORS.dim, marginTop: 2 },
-  rowSubSmall: { color: COLORS.dim, marginTop: 2, fontSize: 12 },
-  when: { color: COLORS.sage, fontWeight: "700" },
-  slot: { color: COLORS.dim },
+  rowTitle: {
+    fontWeight: "700",
+    color: COLORS.text,
+    fontSize: 15,
+  },
+  rowSub: {
+    color: COLORS.textSecondary,
+    marginTop: 2,
+    fontSize: 13,
+  },
+  rowSubSmall: {
+    color: COLORS.textSecondary,
+    marginTop: 2,
+    fontSize: 12,
+  },
+  when: {
+    color: COLORS.primary,
+    fontWeight: "700",
+    fontSize: 13,
+  },
+  slot: {
+    color: COLORS.textSecondary,
+    fontSize: 12,
+  },
 
   dot: {
-    width: 14,
-    height: 14,
-    borderRadius: 7,
-    marginRight: 4,
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    marginRight: SPACING.xs,
   },
 
   badge: {
-    paddingHorizontal: 10,
+    paddingHorizontal: SPACING.sm,
     paddingVertical: 4,
-    borderRadius: 999,
-    backgroundColor: COLORS.badgeDone,
+    borderRadius: BORDER_RADIUS.full,
+    backgroundColor: COLORS.statusSchwanger,
   },
-  badgeText: { color: "white", fontWeight: "700", fontSize: 12 },
+  badgeText: {
+    color: COLORS.background,
+    fontWeight: "700",
+    fontSize: 11,
+  },
 
+  // Quick Actions
+  quickActionsGrid: {
+    flexDirection: "row",
+    gap: SPACING.md,
+    marginTop: SPACING.md,
+    marginBottom: SPACING.xl,
+  },
+  quickActionBtn: {
+    flex: 1,
+    backgroundColor: COLORS.card,
+    borderRadius: BORDER_RADIUS.md,
+    padding: SPACING.lg,
+    alignItems: "center",
+    ...SHADOWS.sm,
+    borderWidth: 1,
+    borderColor: COLORS.borderLight,
+  },
+  quickActionIcon: {
+    fontSize: 28,
+    marginBottom: SPACING.sm,
+  },
+  quickActionText: {
+    color: COLORS.text,
+    fontWeight: "600",
+    fontSize: 12,
+    textAlign: "center",
+  },
+
+  // Modal
   overlay: {
     flex: 1,
-    backgroundColor: "rgba(0,0,0,.25)",
+    backgroundColor: COLORS.overlay,
     alignItems: "center",
     justifyContent: "center",
-    padding: 20,
+    padding: SPACING.xl,
   },
   modalCard: {
-    backgroundColor: "white",
-    borderRadius: 12,
-    padding: 18,
+    backgroundColor: COLORS.background,
+    borderRadius: BORDER_RADIUS.md,
+    padding: SPACING.lg,
     width: "100%",
     maxWidth: 620,
-    shadowColor: "#000",
-    shadowOpacity: 0.14,
-    shadowRadius: 18,
-    shadowOffset: { width: 0, height: 10 },
-    elevation: 6,
+    ...SHADOWS.lg,
   },
-  modalHeader: { 
-    flexDirection: "row", 
-    justifyContent: "space-between", 
-    alignItems: "center", 
-    marginBottom: 6 
-  },
-  modalTitle: { fontSize: 18, fontWeight: "800", color: COLORS.text },
-
-  logout: {
-    marginTop: 20,
-    backgroundColor: COLORS.accent,
-    paddingVertical: 14,
-    borderRadius: 14,
+  modalHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: 8,
+    marginBottom: SPACING.md,
   },
-  logoutText: { color: "white", fontWeight: "700" }
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: "800",
+    color: COLORS.text,
+  },
 });

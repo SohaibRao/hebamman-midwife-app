@@ -13,25 +13,13 @@ import {
 import { useAuth } from "@/context/AuthContext";
 import { api } from "@/lib/api";
 import { useMidwifeProfile } from "@/hooks/useMidwifeProfile";
+import { COLORS, SPACING, BORDER_RADIUS } from "@/constants/theme";
+import de from "@/constants/i18n";
 
 // Component Imports
 import RequestCard from "@/components/requests/RequestCard";
 import RequestDetailsModal from "@/components/requests/RequestDetailsModal";
 import RescheduleApprovalModal from "@/components/requests/RescheduleApprovalModal";
-
-// -------------------- Theme --------------------
-const COLORS = {
-  bg: "#F6F8F7",
-  card: "#FFFFFF",
-  text: "#1D1D1F",
-  dim: "#5C6B63",
-  accent: "#2E5A49",
-  sage: "#7F9086",
-  pending: "#EAB308",
-  approved: "#22C55E",
-  rejected: "#EF4444",
-  line: "#E5E7EB",
-};
 
 // -------------------- Types --------------------
 type RequestType = "edit" | "cancelled";
@@ -75,7 +63,7 @@ async function readJsonSafe<T = any>(res: Response): Promise<T> {
 const formatDate = (dateStr: string) => {
   try {
     const date = new Date(dateStr);
-    return date.toLocaleDateString(undefined, {
+    return date.toLocaleDateString('de-DE', {
       weekday: "short",
       day: "2-digit",
       month: "short",
@@ -87,22 +75,22 @@ const formatDate = (dateStr: string) => {
 };
 
 const getRequestTypeLabel = (type: RequestType) => {
-  return type === "edit" ? "Reschedule" : "Cancellation";
+  return type === "edit" ? de.requests.types.reschedule : de.requests.types.cancellation;
 };
 
 const getStatusBadgeStyle = (status: RequestStatus) => {
   const styles: Record<RequestStatus, any> = {
     pending: {
-      backgroundColor: "#FEF3C7",
-      color: "#92400E",
+      backgroundColor: COLORS.warningLight,
+      color: COLORS.warningDark,
     },
     approved: {
-      backgroundColor: "#D1FAE5",
-      color: "#065F46",
+      backgroundColor: COLORS.successLight,
+      color: COLORS.successDark,
     },
     rejected: {
-      backgroundColor: "#FEE2E2",
-      color: "#991B1B",
+      backgroundColor: COLORS.errorLight,
+      color: COLORS.errorDark,
     },
   };
   return styles[status];
@@ -246,43 +234,43 @@ export default function RequestsScreen() {
   // Loading state
   if (pf.status === "loading" || (!midwifeId && loading)) {
     return (
-      <View style={[styles.center, { flex: 1, backgroundColor: COLORS.bg }]}>
-        <ActivityIndicator size="large" color={COLORS.accent} />
-        <Text style={{ marginTop: 8, color: COLORS.dim }}>Loading...</Text>
+      <View style={[styles.center, { flex: 1, backgroundColor: COLORS.backgroundGray }]}>
+        <ActivityIndicator size="large" color={COLORS.primary} />
+        <Text style={{ marginTop: 8, color: COLORS.textSecondary }}>{de.common.loading}</Text>
       </View>
     );
   }
 
   return (
-    <View style={{ flex: 1, backgroundColor: COLORS.bg }}>
+    <View style={{ flex: 1, backgroundColor: COLORS.backgroundGray }}>
       {/* Header */}
       <View style={styles.header}>
-        <Text style={styles.title}>Patient Requests</Text>
-        <Text style={styles.subtitle}>{counts.all} total requests</Text>
+        <Text style={styles.title}>{de.requests.title}</Text>
+        <Text style={styles.subtitle}>{counts.all} {de.requests.totalCount}</Text>
       </View>
 
       {/* Filters */}
       <View style={styles.filterContainer}>
-        <Text style={styles.filterLabel}>Filter by Status</Text>
+        <Text style={styles.filterLabel}>Nach Status filtern</Text>
         <ScrollView horizontal showsHorizontalScrollIndicator={false}>
           <View style={styles.filterRow}>
             <FilterButton
-              label={`All (${counts.all})`}
+              label={`${de.common.all} (${counts.all})`}
               isActive={filter === "all"}
               onPress={() => setFilter("all")}
             />
             <FilterButton
-              label={`Pending (${counts.pending})`}
+              label={`${de.requests.status.pending} (${counts.pending})`}
               isActive={filter === "pending"}
               onPress={() => setFilter("pending")}
             />
             <FilterButton
-              label={`Approved (${counts.approved})`}
+              label={`${de.requests.status.approved} (${counts.approved})`}
               isActive={filter === "approved"}
               onPress={() => setFilter("approved")}
             />
             <FilterButton
-              label={`Rejected (${counts.rejected})`}
+              label={`${de.requests.status.rejected} (${counts.rejected})`}
               isActive={filter === "rejected"}
               onPress={() => setFilter("rejected")}
             />
@@ -292,8 +280,8 @@ export default function RequestsScreen() {
 
       {/* Error */}
       {error && (
-        <View style={{ paddingHorizontal: 16, paddingVertical: 8 }}>
-          <Text style={{ color: COLORS.rejected }}>{error}</Text>
+        <View style={{ paddingHorizontal: SPACING.lg, paddingVertical: SPACING.sm }}>
+          <Text style={{ color: COLORS.error }}>{error}</Text>
         </View>
       )}
 
@@ -301,18 +289,18 @@ export default function RequestsScreen() {
       <FlatList
         data={filteredRequests}
         keyExtractor={(item) => item._id}
-        contentContainerStyle={{ padding: 16, gap: 12 }}
+        contentContainerStyle={{ padding: SPACING.lg, gap: SPACING.md }}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
             onRefresh={onRefresh}
-            colors={[COLORS.accent]}
+            colors={[COLORS.primary]}
           />
         }
         ListEmptyComponent={
-          <View style={[styles.center, { padding: 24 }]}>
-            <Text style={{ color: COLORS.dim, textAlign: "center" }}>
-              {loading ? "Loading requests..." : `No ${filter !== "all" ? filter : ""} requests found`}
+          <View style={[styles.center, { padding: SPACING.xxl }]}>
+            <Text style={{ color: COLORS.textSecondary, textAlign: "center" }}>
+              {loading ? "Anfragen werden geladen..." : `Keine ${filter !== "all" ? filter : ""} Anfragen gefunden`}
             </Text>
           </View>
         }
@@ -377,12 +365,12 @@ const styles = StyleSheet.create({
   center: { alignItems: "center", justifyContent: "center" },
 
   header: {
-    paddingTop: 14,
-    paddingHorizontal: 16,
-    paddingBottom: 12,
+    paddingTop: SPACING.md,
+    paddingHorizontal: SPACING.lg,
+    paddingBottom: SPACING.md,
     backgroundColor: COLORS.card,
     borderBottomWidth: 1,
-    borderBottomColor: COLORS.line,
+    borderBottomColor: COLORS.border,
   },
   title: {
     fontSize: 24,
@@ -391,45 +379,45 @@ const styles = StyleSheet.create({
   },
   subtitle: {
     fontSize: 14,
-    color: COLORS.dim,
-    marginTop: 4,
+    color: COLORS.textSecondary,
+    marginTop: SPACING.xs,
   },
 
   filterContainer: {
-    paddingVertical: 12,
-    paddingHorizontal: 16,
+    paddingVertical: SPACING.md,
+    paddingHorizontal: SPACING.lg,
     backgroundColor: COLORS.card,
     borderBottomWidth: 1,
-    borderBottomColor: COLORS.line,
+    borderBottomColor: COLORS.border,
   },
   filterLabel: {
     fontSize: 14,
     fontWeight: "700",
-    color: COLORS.dim,
-    marginBottom: 8,
+    color: COLORS.textSecondary,
+    marginBottom: SPACING.sm,
   },
   filterRow: {
     flexDirection: "row",
-    gap: 8,
+    gap: SPACING.sm,
   },
   filterBtn: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
-    backgroundColor: COLORS.bg,
+    paddingHorizontal: SPACING.lg,
+    paddingVertical: SPACING.sm,
+    borderRadius: BORDER_RADIUS.full,
+    backgroundColor: COLORS.backgroundGray,
     borderWidth: 1,
-    borderColor: COLORS.line,
+    borderColor: COLORS.border,
   },
   filterBtnActive: {
-    backgroundColor: COLORS.accent,
-    borderColor: COLORS.accent,
+    backgroundColor: COLORS.primary,
+    borderColor: COLORS.primary,
   },
   filterBtnText: {
     fontSize: 13,
     fontWeight: "700",
-    color: COLORS.dim,
+    color: COLORS.textSecondary,
   },
   filterBtnTextActive: {
-    color: "white",
+    color: COLORS.background,
   },
 });

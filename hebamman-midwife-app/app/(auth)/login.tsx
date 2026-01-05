@@ -15,17 +15,8 @@ import {
   StyleSheet,
 } from "react-native";
 import { useAuth } from "@/context/AuthContext";
-
-const COLORS = {
-  sage: "#7F9086",
-  sageDark: "#6F8076",
-  btn: "#2E5A49",
-  text: "#1D1D1F",
-  dim: "#5C6B63",
-  card: "#FFFFFF",
-  input: "#F3F5F4",
-  danger: "#B00020",
-};
+import { COLORS, SPACING, BORDER_RADIUS } from "@/constants/theme";
+import de from "@/constants/i18n";
 
 export default function LoginScreen() {
   const router = useRouter();
@@ -60,7 +51,7 @@ export default function LoginScreen() {
   };
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: "#F6F8F7" }}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: COLORS.backgroundGray }}>
       <KeyboardAvoidingView
         behavior={Platform.OS === "ios" ? "padding" : undefined}
         style={{ flex: 1 }}
@@ -73,18 +64,18 @@ export default function LoginScreen() {
           />
           <Text style={styles.brand}>hebammenbüro</Text>
           <Text style={styles.tagline}>
-            geschaffen für freiberufliche Hebammen
+            {de.appTagline}
           </Text>
         </View>
 
         {/* Card */}
         <View style={styles.card}>
-          <Text style={styles.cardTitle}>Anmelden</Text>
+          <Text style={styles.cardTitle}>{de.auth.login}</Text>
 
-          <Text style={styles.label}>E-Mail</Text>
+          <Text style={styles.label}>{de.auth.email}</Text>
           <TextInput
             placeholder="name@beispiel.de"
-            placeholderTextColor={COLORS.dim}
+            placeholderTextColor={COLORS.textSecondary}
             autoCapitalize="none"
             keyboardType="email-address"
             autoComplete="email"
@@ -94,10 +85,10 @@ export default function LoginScreen() {
             returnKeyType="next"
           />
 
-          <Text style={[styles.label, { marginTop: 12 }]}>Passwort</Text>
+          <Text style={[styles.label, { marginTop: SPACING.md }]}>{de.auth.password}</Text>
           <TextInput
             placeholder="••••••••"
-            placeholderTextColor={COLORS.dim}
+            placeholderTextColor={COLORS.textSecondary}
             secureTextEntry
             autoComplete="password"
             style={styles.input}
@@ -112,7 +103,7 @@ export default function LoginScreen() {
             <Link href="/(auth)/forgot-password" asChild>
               <TouchableOpacity>
                 <Text style={styles.forgotPasswordText}>
-                  Passwort vergessen?
+                  {de.auth.forgotPassword}
                 </Text>
               </TouchableOpacity>
             </Link>
@@ -128,9 +119,9 @@ export default function LoginScreen() {
             disabled={disabled}
           >
             {status === "signing-in" ? (
-              <ActivityIndicator color={COLORS.card} />
+              <ActivityIndicator color={COLORS.background} />
             ) : (
-              <Text style={styles.btnText}>Anmelden</Text>
+              <Text style={styles.btnText}>{de.auth.login}</Text>
             )}
           </TouchableOpacity>
         </View>
@@ -143,13 +134,13 @@ const styles = StyleSheet.create({
   hero: {
     alignItems: "center",
     paddingVertical: 40,
-    backgroundColor: COLORS.sage + "15",
+    backgroundColor: COLORS.primaryLight,
   },
   logo: {
     width: 100,
     height: 100,
     borderRadius: 50,
-    marginBottom: 12,
+    marginBottom: SPACING.md,
   },
   brand: {
     fontSize: 28,
@@ -159,7 +150,7 @@ const styles = StyleSheet.create({
   },
   tagline: {
     fontSize: 14,
-    color: COLORS.dim,
+    color: COLORS.textSecondary,
     textAlign: "center",
   },
   card: {
@@ -167,56 +158,57 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.card,
     borderTopLeftRadius: 32,
     borderTopRightRadius: 32,
-    marginTop: 20,
-    padding: 24,
+    marginTop: SPACING.xl,
+    padding: SPACING.xxl,
   },
   cardTitle: {
     fontSize: 26,
     fontWeight: "800",
     color: COLORS.text,
-    marginBottom: 24,
+    marginBottom: SPACING.xxl,
   },
   label: {
     fontSize: 14,
     fontWeight: "700",
     color: COLORS.text,
-    marginBottom: 8,
+    marginBottom: SPACING.sm,
   },
   input: {
-    backgroundColor: COLORS.input,
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
+    backgroundColor: COLORS.backgroundGray,
+    borderRadius: BORDER_RADIUS.md,
+    paddingHorizontal: SPACING.lg,
+    paddingVertical: SPACING.md,
     fontSize: 16,
     color: COLORS.text,
   },
   forgotPasswordContainer: {
     alignItems: "flex-end",
-    marginTop: 12,
-    marginBottom: 24,
+    marginTop: SPACING.md,
+    marginBottom: SPACING.xxl,
   },
   forgotPasswordText: {
     fontSize: 14,
-    color: COLORS.btn,
+    color: COLORS.primary,
     fontWeight: "600",
   },
   error: {
-    color: COLORS.danger,
+    color: COLORS.error,
     fontSize: 14,
-    marginBottom: 16,
+    marginBottom: SPACING.lg,
   },
   btn: {
-    backgroundColor: COLORS.btn,
-    borderRadius: 12,
-    paddingVertical: 16,
+    backgroundColor: COLORS.primary,
+    borderRadius: BORDER_RADIUS.md,
+    paddingVertical: SPACING.lg,
     alignItems: "center",
-    marginTop: 8,
+    marginTop: SPACING.sm,
   },
   btnDisabled: {
-    backgroundColor: COLORS.dim,
+    backgroundColor: COLORS.textSecondary,
+    opacity: 0.5,
   },
   btnText: {
-    color: COLORS.card,
+    color: COLORS.background,
     fontSize: 16,
     fontWeight: "700",
   },

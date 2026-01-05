@@ -14,16 +14,8 @@ import { Image } from "expo-image";
 import * as WebBrowser from "expo-web-browser";
 import { useAuth } from "@/context/AuthContext";
 import { useMidwifeProfile, MidwifeProfile } from "@/hooks/useMidwifeProfile";
-
-const COLORS = {
-  bg: "#F6F8F7",
-  card: "#FFFFFF",
-  text: "#1D1D1F",
-  dim: "#5C6B63",
-  accent: "#2E5A49",
-  sage: "#7F9086",
-  line: "#E5E7EB",
-};
+import { COLORS, SPACING, BORDER_RADIUS } from "@/constants/theme";
+import de from "@/constants/i18n";
 
 export default function ProfileScreen() {
   const { user } = useAuth();
@@ -52,8 +44,8 @@ export default function ProfileScreen() {
 
   return (
     <ScrollView
-      style={{ flex: 1, backgroundColor: COLORS.bg }}
-      contentContainerStyle={{ padding: 16 }}
+      style={{ flex: 1, backgroundColor: COLORS.backgroundGray }}
+      contentContainerStyle={{ padding: SPACING.lg }}
       refreshControl={
         <RefreshControl refreshing={status === "loading"} onRefresh={refresh} />
       }
@@ -84,22 +76,22 @@ export default function ProfileScreen() {
 
         {/* Contact & Address */}
         <View style={styles.divider} />
-        <Row label="Email" value={data?.personalInfo?.email} onPressValue={(v) => Linking.openURL(`mailto:${v}`)} />
-        <Row label="Phone" value={data?.personalInfo?.phone} onPressValue={(v) => Linking.openURL(`tel:${v}`)} />
+        <Row label="E-Mail" value={data?.personalInfo?.email} onPressValue={(v) => Linking.openURL(`mailto:${v}`)} />
+        <Row label="Telefon" value={data?.personalInfo?.phone} onPressValue={(v) => Linking.openURL(`tel:${v}`)} />
         <Row
-          label="Address"
+          label="Adresse"
           value={
             data?.personalInfo?.googleAddress?.fullAddress ||
             data?.personalInfo?.address
           }
         />
-        <Row label="Service radius (km)" value={data?.personalInfo?.serviceRadius} />
-        <Row label="Type" value={data?.midwifeType?.midwifeType} />
+        <Row label="Serviceradius (km)" value={data?.personalInfo?.serviceRadius} />
+        <Row label="Typ" value={data?.midwifeType?.midwifeType} />
       </View>
 
       {/* About / Statement */}
       {(data?.personalInfo?.about || data?.personalInfo?.personalStatement) && (
-        <Card title="About">
+        <Card title="Über mich">
           {!!data?.personalInfo?.about && (
             <Text style={styles.p}>{data.personalInfo.about}</Text>
           )}
@@ -111,12 +103,12 @@ export default function ProfileScreen() {
 
       {/* Services */}
       {services.length > 0 && (
-        <Card title="Services">
+        <Card title="Leistungen">
           {services.map((s, i) => (
             <View key={s.key} style={[styles.serviceRow, i > 0 && styles.rowDivider]}>
               <View style={{ flex: 1 }}>
                 <Text style={styles.serviceTitle}>
-                  {s.code || s.key} — {s.title || "Service"}
+                  {s.code || s.key} — {s.title || "Leistung"}
                 </Text>
                 {!!s.description && <Text style={styles.serviceSub}>{s.description}</Text>}
                 <Text style={styles.serviceMeta}>
@@ -125,7 +117,7 @@ export default function ProfileScreen() {
               </View>
               <View style={{ alignItems: "flex-end" }}>
                 {!!s.startingAt && <Text style={styles.kv}>{s.startingAt}</Text>}
-                {!!s.appointments && <Text style={styles.kv}>Appts: {s.appointments}</Text>}
+                {!!s.appointments && <Text style={styles.kv}>Termine: {s.appointments}</Text>}
                 {!!s.turnover && <Text style={styles.kv}>€ {s.turnover}</Text>}
               </View>
             </View>
@@ -135,7 +127,7 @@ export default function ProfileScreen() {
 
       {/* Timetable (collapsible-by-day simple render) */}
       {!!data?.identity?.timetable && (
-        <Card title="Weekly Timetable">
+        <Card title="Wöchentlicher Zeitplan">
           {Object.entries(data.identity.timetable).map(([day, conf], i) => (
             <TimetableDay key={day} day={day} slotsMap={conf?.slots ?? {}} first={i === 0} />
           ))}
@@ -144,29 +136,29 @@ export default function ProfileScreen() {
 
       {/* Bank Info */}
       {!!data?.bankInfo && (
-        <Card title="Bank Information">
-          <Row label="Account holder" value={data.bankInfo.accountHolderName} />
+        <Card title="Bankinformationen">
+          <Row label="Kontoinhaber" value={data.bankInfo.accountHolderName} />
           <Row label="Bank" value={data.bankInfo.bankName} />
-          <Row label="Account No." value={data.bankInfo.accountNumber} />
-          <Row label="Routing No." value={data.bankInfo.routingNumber} />
+          <Row label="Kontonummer" value={data.bankInfo.accountNumber} />
+          <Row label="Bankleitzahl" value={data.bankInfo.routingNumber} />
         </Card>
       )}
 
       {/* More Info */}
       {!!data?.moreInfo && (
-        <Card title="More Information">
-          <Row label="Acupuncture" value={data.moreInfo.acupuncture} />
-          <Row label="Experience" value={data.moreInfo.professionalExperience} />
-          <Row label="Message" value={data.moreInfo.message} />
+        <Card title="Weitere Informationen">
+          <Row label="Akupunktur" value={data.moreInfo.acupuncture} />
+          <Row label="Erfahrung" value={data.moreInfo.professionalExperience} />
+          <Row label="Nachricht" value={data.moreInfo.message} />
           {!!data.moreInfo.supportedPregnancies && (
-            <Row label="Supported pregnancies" value={String(data.moreInfo.supportedPregnancies)} />
+            <Row label="Unterstützte Schwangerschaften" value={String(data.moreInfo.supportedPregnancies)} />
           )}
         </Card>
       )}
 
       {/* Social Links */}
       {!!data?.socialLinks && Object.values(data.socialLinks).some(Boolean) && (
-        <Card title="Social">
+        <Card title="Soziale Medien">
           {Object.entries(data.socialLinks).map(([k, v]) =>
             v ? (
               <TouchableOpacity key={k} onPress={() => WebBrowser.openBrowserAsync(v)}>
@@ -179,7 +171,7 @@ export default function ProfileScreen() {
 
       {/* Testimonials (horizontal) */}
       {testimonials.length > 0 && (
-        <Card title="Testimonials">
+        <Card title="Erfahrungsberichte">
           <FlatList
             horizontal
             showsHorizontalScrollIndicator={false}
@@ -205,10 +197,10 @@ export default function ProfileScreen() {
 
       {/* Loading / Error fallback */}
       {status === "loading" && !data && (
-        <Text style={{ color: COLORS.dim, marginTop: 8 }}>Loading profile…</Text>
+        <Text style={{ color: COLORS.textSecondary, marginTop: SPACING.sm }}>{de.common.loading}</Text>
       )}
       {status === "error" && (
-        <Text style={{ color: "crimson", marginTop: 8 }}>{error ?? "Failed to load profile"}</Text>
+        <Text style={{ color: COLORS.error, marginTop: SPACING.sm }}>{error ?? "Profil konnte nicht geladen werden"}</Text>
       )}
     </ScrollView>
   );
@@ -272,8 +264,8 @@ function TimetableDay({
         <Text style={styles.chev}>{open ? "▴" : "▾"}</Text>
       </TouchableOpacity>
       {open && (
-        <View style={{ marginTop: 6 }}>
-          {codes.length === 0 && <Text style={styles.dimSmall}>No slots</Text>}
+        <View style={{ marginTop: SPACING.xs }}>
+          {codes.length === 0 && <Text style={styles.dimSmall}>Keine Slots</Text>}
           {codes.map((code) => (
             <View key={code} style={{ marginBottom: 8 }}>
               <Text style={styles.ttCode}>{code}</Text>
@@ -295,9 +287,9 @@ function TimetableDay({
 const styles = StyleSheet.create({
   headerCard: {
     backgroundColor: COLORS.card,
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 16,
+    borderRadius: BORDER_RADIUS.lg,
+    padding: SPACING.lg,
+    marginBottom: SPACING.lg,
     shadowColor: "#000",
     shadowOpacity: 0.06,
     shadowRadius: 10,
@@ -308,61 +300,61 @@ const styles = StyleSheet.create({
   avatar: { width: 72, height: 72, borderRadius: 36, backgroundColor: "#eee" },
   logo: { width: 64, height: 64 },
   name: { fontSize: 20, fontWeight: "800", color: COLORS.text },
-  title: { color: COLORS.sage, marginTop: 2, fontWeight: "700" },
-  slogan: { color: COLORS.dim, marginTop: 2 },
+  title: { color: COLORS.primary, marginTop: SPACING.xs, fontWeight: "700" },
+  slogan: { color: COLORS.textSecondary, marginTop: SPACING.xs },
 
   divider: {
     height: StyleSheet.hairlineWidth,
-    backgroundColor: COLORS.line,
-    marginVertical: 12,
+    backgroundColor: COLORS.border,
+    marginVertical: SPACING.md,
   },
 
   card: {
     backgroundColor: COLORS.card,
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 16,
+    borderRadius: BORDER_RADIUS.lg,
+    padding: SPACING.lg,
+    marginBottom: SPACING.lg,
     shadowColor: "#000",
     shadowOpacity: 0.06,
     shadowRadius: 10,
     shadowOffset: { width: 0, height: 4 },
     elevation: 2,
   },
-  cardTitle: { fontSize: 18, fontWeight: "800", color: COLORS.text, marginBottom: 8 },
+  cardTitle: { fontSize: 18, fontWeight: "800", color: COLORS.text, marginBottom: SPACING.sm },
   p: { color: COLORS.text, lineHeight: 20 },
-  pSmall: { color: COLORS.dim, lineHeight: 18, marginTop: 4 },
-  dimSmall: { color: COLORS.dim, fontSize: 12 },
+  pSmall: { color: COLORS.textSecondary, lineHeight: 18, marginTop: SPACING.xs },
+  dimSmall: { color: COLORS.textSecondary, fontSize: 12 },
 
   row: {
     flexDirection: "row",
     alignItems: "center",
-    paddingVertical: 10,
+    paddingVertical: SPACING.sm,
   },
-  rowLabel: { width: 150, color: COLORS.dim, fontWeight: "700" },
+  rowLabel: { width: 150, color: COLORS.textSecondary, fontWeight: "700" },
   rowValue: { color: COLORS.text, textAlign: "right" },
-  link: { color: COLORS.accent, fontWeight: "700" },
-  chev: { color: COLORS.dim, marginLeft: 6 },
+  link: { color: COLORS.primary, fontWeight: "700" },
+  chev: { color: COLORS.textSecondary, marginLeft: SPACING.xs },
 
-  serviceRow: { paddingVertical: 10, flexDirection: "row", alignItems: "flex-start", gap: 12 },
-  rowDivider: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: COLORS.line },
+  serviceRow: { paddingVertical: SPACING.sm, flexDirection: "row", alignItems: "flex-start", gap: SPACING.md },
+  rowDivider: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: COLORS.border },
   serviceTitle: { color: COLORS.text, fontWeight: "800" },
-  serviceSub: { color: COLORS.dim, marginTop: 2 },
-  serviceMeta: { color: COLORS.sage, marginTop: 4, fontWeight: "700" },
-  kv: { color: COLORS.dim },
+  serviceSub: { color: COLORS.textSecondary, marginTop: SPACING.xs },
+  serviceMeta: { color: COLORS.primary, marginTop: SPACING.xs, fontWeight: "700" },
+  kv: { color: COLORS.textSecondary },
 
-  ttDay: { paddingVertical: 8 },
+  ttDay: { paddingVertical: SPACING.sm },
   ttHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
   ttDayTitle: { fontWeight: "800", color: COLORS.text },
-  ttCode: { color: COLORS.accent, fontWeight: "800", marginTop: 6 },
-  ttSlots: { color: COLORS.text, marginTop: 2 },
+  ttCode: { color: COLORS.primary, fontWeight: "800", marginTop: SPACING.xs },
+  ttSlots: { color: COLORS.text, marginTop: SPACING.xs },
 
   testimonial: {
     width: 220,
-    backgroundColor: "#FAFAFA",
-    borderRadius: 12,
-    padding: 12,
+    backgroundColor: COLORS.backgroundGray,
+    borderRadius: BORDER_RADIUS.md,
+    padding: SPACING.md,
   },
-  testimonialImg: { width: 48, height: 48, borderRadius: 24, marginBottom: 6, backgroundColor: "#eee" },
+  testimonialImg: { width: 48, height: 48, borderRadius: 24, marginBottom: SPACING.xs, backgroundColor: "#eee" },
   testimonialName: { fontWeight: "800", color: COLORS.text },
-  testimonialRole: { color: COLORS.dim, fontSize: 12, marginBottom: 6 },
+  testimonialRole: { color: COLORS.textSecondary, fontSize: 12, marginBottom: SPACING.xs },
 });

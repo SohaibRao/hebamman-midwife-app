@@ -7,15 +7,8 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-
-const COLORS = {
-  bg: "#F6F8F7",
-  card: "#FFFFFF",
-  text: "#1D1D1F",
-  dim: "#5C6B63",
-  accent: "#2E5A49",
-  line: "#E5E7EB",
-};
+import { COLORS, SPACING, BORDER_RADIUS } from "@/constants/theme";
+import de from "@/constants/i18n";
 
 type StatusCounts = {
   all: number;
@@ -37,26 +30,26 @@ export default function StatusFilter({
 }: Props) {
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Filter by Status</Text>
+      <Text style={styles.title}>{de.appointments.filter.all}</Text>
       <ScrollView horizontal showsHorizontalScrollIndicator={false}>
         <View style={styles.buttonRow}>
           <FilterButton
-            label={`All (${statusCounts.all})`}
+            label={`${de.appointments.filter.all} (${statusCounts.all})`}
             isActive={selectedFilter === "all"}
             onPress={() => onFilterChange("all")}
           />
           <FilterButton
-            label={`Active (${statusCounts.active})`}
+            label={`${de.appointments.filter.active} (${statusCounts.active})`}
             isActive={selectedFilter === "active"}
             onPress={() => onFilterChange("active")}
           />
           <FilterButton
-            label={`Pending (${statusCounts.pending})`}
+            label={`${de.appointments.filter.pending} (${statusCounts.pending})`}
             isActive={selectedFilter === "pending"}
             onPress={() => onFilterChange("pending")}
           />
           <FilterButton
-            label={`Cancelled (${statusCounts.cancelled})`}
+            label={`${de.appointments.filter.cancelled} (${statusCounts.cancelled})`}
             isActive={selectedFilter === "cancelled"}
             onPress={() => onFilterChange("cancelled")}
           />
@@ -89,38 +82,38 @@ function FilterButton({
 
 const styles = StyleSheet.create({
   container: {
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingHorizontal: SPACING.lg,
+    paddingVertical: SPACING.md,
     backgroundColor: COLORS.card,
   },
   title: {
     fontSize: 14,
     fontWeight: "700",
-    color: COLORS.dim,
-    marginBottom: 8,
+    color: COLORS.textSecondary,
+    marginBottom: SPACING.sm,
   },
   buttonRow: {
     flexDirection: "row",
-    gap: 8,
+    gap: SPACING.sm,
   },
   filterButton: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
-    backgroundColor: COLORS.bg,
+    paddingHorizontal: SPACING.lg,
+    paddingVertical: SPACING.sm,
+    borderRadius: BORDER_RADIUS.full,
+    backgroundColor: COLORS.backgroundGray,
     borderWidth: 1,
-    borderColor: COLORS.line,
+    borderColor: COLORS.border,
   },
   filterButtonActive: {
-    backgroundColor: COLORS.accent,
-    borderColor: COLORS.accent,
+    backgroundColor: COLORS.primary,
+    borderColor: COLORS.primary,
   },
   filterButtonText: {
     fontSize: 13,
     fontWeight: "700",
-    color: COLORS.dim,
+    color: COLORS.textSecondary,
   },
   filterButtonTextActive: {
-    color: "white",
+    color: COLORS.background,
   },
 });
