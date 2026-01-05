@@ -17,6 +17,7 @@ import { useMidwifeProfile } from "@/hooks/useMidwifeProfile";
 import { useAuth } from "@/context/AuthContext";
 import { COLORS, SPACING, BORDER_RADIUS } from "@/constants/theme";
 import de from "@/constants/i18n";
+import { Ionicons } from "@expo/vector-icons";
 
 // -------------------- Types --------------------
 type Apt = {
@@ -897,13 +898,15 @@ export default function PatientAppointmentsScreen() {
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-          <Text style={styles.backText}>← Zurück</Text>
+          <Ionicons name="arrow-back" size={20} color={COLORS.primary} style={{ marginRight: 6 }} />
+          <Text style={styles.backText}>Zurück</Text>
         </TouchableOpacity>
         <Text style={styles.title}>{patientName}</Text>
         <Text style={styles.subtitle}>{allAppointments.length} Termine</Text>
 
         <TouchableOpacity onPress={openCreateModal} style={styles.createBtn}>
-          <Text style={styles.createBtnText}>+ Neuer Termin</Text>
+          <Ionicons name="add" size={20} color="white" style={{ marginRight: 6 }} />
+          <Text style={styles.createBtnText}>Neuer Termin</Text>
         </TouchableOpacity>
       </View>
 
@@ -1166,7 +1169,7 @@ export default function PatientAppointmentsScreen() {
       <View style={styles.modalHeader}>
         <Text style={styles.modalTitle}>Termindetails</Text>
         <TouchableOpacity onPress={closeDetails}>
-          <Text style={{ fontSize: 20, color: COLORS.textSecondary, fontWeight: "800" }}>✕</Text>
+          <Ionicons name="close" size={28} color={COLORS.textSecondary} />
         </TouchableOpacity>
       </View>
       
@@ -1263,8 +1266,9 @@ export default function PatientAppointmentsScreen() {
             </View>
 
             <View style={styles.warningBox}>
+              <Ionicons name="warning-outline" size={20} color={COLORS.warningDark} style={{ marginRight: 8 }} />
               <Text style={styles.warningText}>
-                ⚠️ This action cannot be undone
+                This action cannot be undone
               </Text>
             </View>
           </View>
@@ -1465,7 +1469,7 @@ export default function PatientAppointmentsScreen() {
         <View style={styles.modalHeader}>
           <Text style={styles.modalTitle}>Termin bearbeiten</Text>
           <TouchableOpacity onPress={closeEdit}>
-            <Text style={{ fontSize: 20, color: COLORS.textSecondary, fontWeight: "800" }}>✕</Text>
+            <Ionicons name="close" size={28} color={COLORS.textSecondary} />
           </TouchableOpacity>
         </View>
 
@@ -1673,7 +1677,7 @@ export default function PatientAppointmentsScreen() {
         <View style={styles.modalHeader}>
           <Text style={styles.modalTitle}>Neuer Termin</Text>
           <TouchableOpacity onPress={closeCreateModal}>
-            <Text style={{ fontSize: 20, color: COLORS.textSecondary, fontWeight: "800" }}>✕</Text>
+            <Ionicons name="close" size={28} color={COLORS.textSecondary} />
           </TouchableOpacity>
         </View>
 
@@ -1915,7 +1919,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: COLORS.border,
   },
-  backBtn: { marginBottom: 8 },
+  backBtn: { marginBottom: 8, flexDirection: "row", alignItems: "center" },
   backText: { color: COLORS.primary, fontSize: 14, fontWeight: "700" },
   title: { fontSize: 24, fontWeight: "800", color: COLORS.text },
   subtitle: { fontSize: 14, color: COLORS.textSecondary, marginTop: 4, marginBottom: 12 },
@@ -1925,6 +1929,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     borderRadius: 8,
     alignSelf: "flex-start",
+    flexDirection: "row",
+    alignItems: "center",
   },
   createBtnText: { color: "white", fontWeight: "700", fontSize: 14 },
   tabsWrap: { paddingHorizontal: 16, paddingVertical: 12, backgroundColor: COLORS.card },
@@ -2202,6 +2208,8 @@ const styles = StyleSheet.create({
     marginTop: 16,
     borderWidth: 1,
     borderColor: "#F59E0B",
+    flexDirection: "row",
+    alignItems: "center",
   },
   warningText: {
     fontSize: 13,

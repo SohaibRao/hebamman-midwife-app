@@ -10,6 +10,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 
 const COLORS = {
   bg: "#F6F8F7",
@@ -128,7 +129,7 @@ export default function CalendarView({
           disabled={index === 0}
           style={[styles.navButton, index === 0 && styles.navButtonDisabled]}
         >
-          <Text style={styles.navButtonText}>◀</Text>
+          <Ionicons name="chevron-back" size={20} color={COLORS.text} />
         </TouchableOpacity>
         <Text style={styles.monthTitle}>{currentMonth?.title || "—"}</Text>
         <TouchableOpacity
@@ -136,7 +137,7 @@ export default function CalendarView({
           disabled={index === months.length - 1}
           style={[styles.navButton, index === months.length - 1 && styles.navButtonDisabled]}
         >
-          <Text style={styles.navButtonText}>▶</Text>
+          <Ionicons name="chevron-forward" size={20} color={COLORS.text} />
         </TouchableOpacity>
       </View>
 
@@ -314,7 +315,7 @@ function AppointmentsModal({
               {selectedDate ? fmtDateShort(selectedDate) : "Appointments"}
             </Text>
             <TouchableOpacity onPress={onClose}>
-              <Text style={styles.closeButton}>✕</Text>
+              <Ionicons name="close" size={24} color={COLORS.dim} />
             </TouchableOpacity>
           </View>
 
@@ -409,13 +410,11 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     borderRadius: 8,
     backgroundColor: "#EEF3F1",
+    alignItems: "center",
+    justifyContent: "center",
   },
   navButtonDisabled: {
     opacity: 0.4,
-  },
-  navButtonText: {
-    color: COLORS.text,
-    fontWeight: "700",
   },
   monthTitle: {
     fontSize: 18,
@@ -534,11 +533,6 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: "800",
     color: COLORS.text,
-  },
-  closeButton: {
-    fontWeight: "800",
-    color: COLORS.dim,
-    fontSize: 20,
   },
   modalScroll: {
     marginTop: 12,

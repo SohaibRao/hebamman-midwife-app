@@ -14,6 +14,7 @@ import {
   StyleSheet,
   Alert,
 } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 import { api } from "@/lib/api";
 
 const COLORS = {
@@ -109,7 +110,7 @@ export default function ForgotPasswordScreen() {
           {/* Success Card */}
           <View style={styles.card}>
             <View style={styles.successIcon}>
-              <Text style={styles.successIconText}>✓</Text>
+              <Ionicons name="checkmark" size={48} color={COLORS.success} />
             </View>
 
             <Text style={styles.cardTitle}>E-Mail überprüfen</Text>
@@ -212,9 +213,10 @@ export default function ForgotPasswordScreen() {
             onPress={handleBackToLogin}
             disabled={isSubmitting}
           >
-            <Text style={styles.backLinkText}>
-              ← Zurück zur Anmeldung
-            </Text>
+            <View style={styles.backLinkContent}>
+              <Ionicons name="arrow-back" size={16} color={COLORS.btn} />
+              <Text style={styles.backLinkText}>Zurück zur Anmeldung</Text>
+            </View>
           </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>
@@ -299,6 +301,11 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginTop: 24,
   },
+  backLinkContent: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
   backLinkText: {
     fontSize: 14,
     color: COLORS.btn,
@@ -313,11 +320,6 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignSelf: "center",
     marginBottom: 24,
-  },
-  successIconText: {
-    fontSize: 48,
-    color: COLORS.success,
-    fontWeight: "bold",
   },
   infoBox: {
     backgroundColor: COLORS.success + "10",

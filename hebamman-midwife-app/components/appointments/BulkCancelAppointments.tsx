@@ -10,6 +10,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 import { api } from "@/lib/api";
 
 // -------------------- Theme --------------------
@@ -226,7 +227,7 @@ export default function BulkCancelAppointments({
           <View style={styles.modalHeader}>
             <Text style={styles.modalTitle}>Bulk Cancel Appointments</Text>
             <TouchableOpacity onPress={handleClose} disabled={isCanceling}>
-              <Text style={{ fontWeight: "800", color: COLORS.dim, fontSize: 20 }}>✕</Text>
+              <Ionicons name="close" size={24} color={COLORS.dim} />
             </TouchableOpacity>
           </View>
 
@@ -248,7 +249,7 @@ export default function BulkCancelAppointments({
                 }
                 style={styles.monthNavBtn}
               >
-                <Text style={styles.navBtnText}>◀</Text>
+                <Ionicons name="chevron-back" size={20} color={COLORS.text} />
               </TouchableOpacity>
               <Text style={styles.monthTitle}>
                 {calendarMonth.toLocaleDateString(undefined, {
@@ -264,7 +265,7 @@ export default function BulkCancelAppointments({
                 }
                 style={styles.monthNavBtn}
               >
-                <Text style={styles.navBtnText}>▶</Text>
+                <Ionicons name="chevron-forward" size={20} color={COLORS.text} />
               </TouchableOpacity>
             </View>
 
@@ -393,10 +394,13 @@ export default function BulkCancelAppointments({
 
                     {/* Warning box */}
                     <View style={styles.warningBox}>
-                      <Text style={styles.warningText}>
-                        ⚠️ This action cannot be undone. All listed appointments will be
-                        cancelled.
-                      </Text>
+                      <View style={styles.warningContent}>
+                        <Ionicons name="warning-outline" size={20} color="#92400E" />
+                        <Text style={styles.warningText}>
+                          This action cannot be undone. All listed appointments will be
+                          cancelled.
+                        </Text>
+                      </View>
                     </View>
                   </>
                 )}
@@ -496,11 +500,8 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     borderRadius: 8,
     backgroundColor: "#EEF3F1",
-  },
-  navBtnText: {
-    color: COLORS.text,
-    fontWeight: "700",
-    fontSize: 16,
+    alignItems: "center",
+    justifyContent: "center",
   },
   monthTitle: {
     fontSize: 16,
@@ -627,11 +628,17 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#F59E0B",
   },
+  warningContent: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+  },
   warningText: {
     fontSize: 13,
     color: "#92400E",
     fontWeight: "600",
-    textAlign: "center",
+    flex: 1,
   },
   footer: {
     flexDirection: "row",

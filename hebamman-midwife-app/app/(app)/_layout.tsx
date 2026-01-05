@@ -5,6 +5,7 @@ import { TouchableOpacity, Text, View, StyleSheet, Modal, ScrollView } from "rea
 import { useState } from "react";
 import { COLORS } from "@/constants/theme";
 import de from "@/constants/i18n";
+import { Ionicons } from "@expo/vector-icons";
 
 function MenuButton() {
   const [visible, setVisible] = useState(false);
@@ -19,7 +20,7 @@ function MenuButton() {
   return (
     <>
       <TouchableOpacity onPress={() => setVisible(true)} style={{ marginLeft: 15 }}>
-        <Text style={{ fontSize: 24, color: "white", fontWeight: "700" }}>☰</Text>
+        <Ionicons name="menu" size={28} color="white" />
       </TouchableOpacity>
 
       <Modal visible={visible} transparent animationType="slide" onRequestClose={() => setVisible(false)}>
@@ -41,12 +42,12 @@ function MenuButton() {
             </View>
 
             <ScrollView style={styles.menuItems}>
-              <MenuItem icon="🏠" label={de.nav.overview} onPress={() => navigateTo("/dashboard")} />
-              <MenuItem icon="👥" label="Leads" onPress={() => navigateTo("/(app)/leads")} />
-              <MenuItem icon="📅" label={de.nav.appointments} onPress={() => navigateTo("/(app)/appointments")} />
-              <MenuItem icon="📋" label={de.nav.requests} onPress={() => navigateTo("/(app)/requests")} />
-              <MenuItem icon="👥" label={de.nav.patients} onPress={() => navigateTo("/(app)/patients")} />
-              <MenuItem icon="👤" label={de.nav.profile} onPress={() => navigateTo("/(app)/profile")} />
+              <MenuItem icon="home-outline" label={de.nav.overview} onPress={() => navigateTo("/dashboard")} />
+              <MenuItem icon="people-outline" label="Leads" onPress={() => navigateTo("/(app)/leads")} />
+              <MenuItem icon="calendar-outline" label={de.nav.appointments} onPress={() => navigateTo("/(app)/appointments")} />
+              <MenuItem icon="document-text-outline" label={de.nav.requests} onPress={() => navigateTo("/(app)/requests")} />
+              <MenuItem icon="people-outline" label={de.nav.patients} onPress={() => navigateTo("/(app)/patients")} />
+              <MenuItem icon="person-outline" label={de.nav.profile} onPress={() => navigateTo("/(app)/profile")} />
             </ScrollView>
 
             {/* Logout */}
@@ -57,7 +58,8 @@ function MenuButton() {
                 logout();
               }}
             >
-              <Text style={styles.logoutText}>🚪 {de.nav.logout}</Text>
+              <Ionicons name="log-out-outline" size={20} color={COLORS.error} style={{ marginRight: 8 }} />
+              <Text style={styles.logoutText}>{de.nav.logout}</Text>
             </TouchableOpacity>
           </TouchableOpacity>
         </TouchableOpacity>
@@ -66,10 +68,10 @@ function MenuButton() {
   );
 }
 
-function MenuItem({ icon, label, onPress }: { icon: string; label: string; onPress: () => void }) {
+function MenuItem({ icon, label, onPress }: { icon: keyof typeof Ionicons.glyphMap; label: string; onPress: () => void }) {
   return (
     <TouchableOpacity style={styles.menuItem} onPress={onPress}>
-      <Text style={styles.menuIcon}>{icon}</Text>
+      <Ionicons name={icon} size={24} color={COLORS.text} style={styles.menuIcon} />
       <Text style={styles.menuLabel}>{label}</Text>
     </TouchableOpacity>
   );
@@ -192,7 +194,9 @@ const styles = StyleSheet.create({
     marginHorizontal: 16,
     paddingVertical: 14,
     borderRadius: 12,
+    flexDirection: "row",
     alignItems: "center",
+    justifyContent: "center",
   },
   logoutText: {
     color: "white",

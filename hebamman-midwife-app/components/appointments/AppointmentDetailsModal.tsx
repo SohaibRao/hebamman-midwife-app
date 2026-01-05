@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 import { COLORS, SPACING, BORDER_RADIUS } from "@/constants/theme";
 import de from "@/constants/i18n";
 
@@ -53,7 +54,7 @@ export default function AppointmentDetailsModal({
           <View style={styles.modalHeader}>
             <Text style={styles.modalTitle}>{de.appointments.appointmentDetails}</Text>
             <TouchableOpacity onPress={onClose}>
-              <Text style={styles.closeButton}>✕</Text>
+              <Ionicons name="close" size={24} color={COLORS.textSecondary} />
             </TouchableOpacity>
           </View>
 
@@ -149,11 +150,6 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: "800",
     color: COLORS.text,
-  },
-  closeButton: {
-    fontWeight: "800",
-    color: COLORS.textSecondary,
-    fontSize: 18,
   },
   detailRow: {
     flexDirection: "row",

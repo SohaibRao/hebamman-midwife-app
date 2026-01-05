@@ -10,6 +10,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 import { api } from "@/lib/api";
 import { useMidwifeProfile } from "@/hooks/useMidwifeProfile";
 import { useAuth } from "@/context/AuthContext";
@@ -451,7 +452,7 @@ export default function RequestDetailsModal({
           <View style={styles.modalHeader}>
             <Text style={styles.modalTitle}>Anfragedetails</Text>
             <TouchableOpacity onPress={onClose} disabled={isProcessing}>
-              <Text style={styles.closeButton}>✕</Text>
+              <Ionicons name="close" size={24} color={COLORS.textSecondary} />
             </TouchableOpacity>
           </View>
 
@@ -555,7 +556,10 @@ export default function RequestDetailsModal({
                       {isProcessing ? (
                         <ActivityIndicator color="white" size="small" />
                       ) : (
-                        <Text style={styles.approveButtonText}>✓ Vorgeschlagene Zeit genehmigen</Text>
+                        <View style={styles.buttonContent}>
+                          <Ionicons name="checkmark" size={20} color={COLORS.background} />
+                          <Text style={styles.approveButtonText}>Vorgeschlagene Zeit genehmigen</Text>
+                        </View>
                       )}
                     </TouchableOpacity>
 
@@ -567,7 +571,10 @@ export default function RequestDetailsModal({
                       disabled={isProcessing}
                       style={[styles.editButton, isProcessing && { opacity: 0.6 }]}
                     >
-                      <Text style={styles.editButtonText}>✎ Bearbeiten & Umplanen</Text>
+                      <View style={styles.buttonContent}>
+                        <Ionicons name="create-outline" size={20} color={COLORS.background} />
+                        <Text style={styles.editButtonText}>Bearbeiten & Umplanen</Text>
+                      </View>
                     </TouchableOpacity>
 
                     <TouchableOpacity
@@ -575,7 +582,10 @@ export default function RequestDetailsModal({
                       disabled={isProcessing}
                       style={[styles.rejectButton, isProcessing && { opacity: 0.6 }]}
                     >
-                      <Text style={styles.rejectButtonText}>✕ Anfrage ablehnen</Text>
+                      <View style={styles.buttonContent}>
+                        <Ionicons name="close" size={20} color={COLORS.background} />
+                        <Text style={styles.rejectButtonText}>Anfrage ablehnen</Text>
+                      </View>
                     </TouchableOpacity>
                   </>
                 ) : (
@@ -589,7 +599,10 @@ export default function RequestDetailsModal({
                       {isProcessing ? (
                         <ActivityIndicator color="white" size="small" />
                       ) : (
-                        <Text style={styles.approveButtonText}>✓ Genehmigen & Termin absagen</Text>
+                        <View style={styles.buttonContent}>
+                          <Ionicons name="checkmark" size={20} color={COLORS.background} />
+                          <Text style={styles.approveButtonText}>Genehmigen & Termin absagen</Text>
+                        </View>
                       )}
                     </TouchableOpacity>
 
@@ -598,7 +611,10 @@ export default function RequestDetailsModal({
                       disabled={isProcessing}
                       style={[styles.rejectButton, isProcessing && { opacity: 0.6 }]}
                     >
-                      <Text style={styles.rejectButtonText}>✕ Anfrage ablehnen</Text>
+                      <View style={styles.buttonContent}>
+                        <Ionicons name="close" size={20} color={COLORS.background} />
+                        <Text style={styles.rejectButtonText}>Anfrage ablehnen</Text>
+                      </View>
                     </TouchableOpacity>
                   </>
                 )}
@@ -660,11 +676,6 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: "800",
     color: COLORS.text,
-  },
-  closeButton: {
-    fontSize: 24,
-    color: COLORS.textSecondary,
-    fontWeight: "800",
   },
   requestTypeBadge: {
     backgroundColor: COLORS.info + "20",
@@ -743,6 +754,12 @@ const styles = StyleSheet.create({
   },
   actionSection: {
     marginTop: SPACING.sm,
+    gap: SPACING.sm,
+  },
+  buttonContent: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
     gap: SPACING.sm,
   },
   approveButton: {

@@ -8,6 +8,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 import { COLORS, SPACING, BORDER_RADIUS } from "@/constants/theme";
 import de from "@/constants/i18n";
 
@@ -72,7 +73,10 @@ export default function CancelConfirmModal({
             </View>
 
             <View style={styles.warningBox}>
-              <Text style={styles.warningText}>⚠️ Diese Aktion kann nicht rückgängig gemacht werden</Text>
+              <View style={styles.warningContent}>
+                <Ionicons name="warning-outline" size={20} color={COLORS.warningDark} />
+                <Text style={styles.warningText}>Diese Aktion kann nicht rückgängig gemacht werden</Text>
+              </View>
             </View>
           </View>
 
@@ -164,11 +168,16 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: COLORS.warning,
   },
+  warningContent: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: SPACING.sm,
+  },
   warningText: {
     fontSize: 13,
     color: COLORS.warningDark,
     fontWeight: "600",
-    textAlign: "center",
   },
   buttonRow: {
     flexDirection: "row",

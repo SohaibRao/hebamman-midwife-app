@@ -10,6 +10,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 import { COLORS, SPACING, BORDER_RADIUS } from "@/constants/theme";
 import de from "@/constants/i18n";
 
@@ -104,7 +105,7 @@ export default function EditAppointmentModal({
           <View style={styles.modalHeader}>
             <Text style={styles.modalTitle}>{de.appointments.editAppointment} {appointment.serviceCode}</Text>
             <TouchableOpacity onPress={onClose}>
-              <Text style={styles.closeButton}>✕</Text>
+              <Ionicons name="close" size={24} color={COLORS.textSecondary} />
             </TouchableOpacity>
           </View>
 
@@ -122,7 +123,7 @@ export default function EditAppointmentModal({
                   }
                   style={styles.navButton}
                 >
-                  <Text style={styles.navButtonText}>◀</Text>
+                  <Ionicons name="chevron-back" size={20} color={COLORS.text} />
                 </TouchableOpacity>
                 <Text style={styles.monthTitle}>
                   {calendarMonth.toLocaleDateString('de-DE', {
@@ -138,7 +139,7 @@ export default function EditAppointmentModal({
                   }
                   style={styles.navButton}
                 >
-                  <Text style={styles.navButtonText}>▶</Text>
+                  <Ionicons name="chevron-forward" size={20} color={COLORS.text} />
                 </TouchableOpacity>
               </View>
 
@@ -412,11 +413,6 @@ const styles = StyleSheet.create({
     fontWeight: "800",
     color: COLORS.text,
   },
-  closeButton: {
-    fontWeight: "800",
-    color: COLORS.textSecondary,
-    fontSize: 20,
-  },
   errorText: {
     color: COLORS.error,
     padding: SPACING.md,
@@ -436,10 +432,8 @@ const styles = StyleSheet.create({
     paddingVertical: SPACING.xs,
     borderRadius: BORDER_RADIUS.sm,
     backgroundColor: COLORS.backgroundGray,
-  },
-  navButtonText: {
-    color: COLORS.text,
-    fontWeight: "700",
+    alignItems: "center",
+    justifyContent: "center",
   },
   monthTitle: {
     fontSize: 16,

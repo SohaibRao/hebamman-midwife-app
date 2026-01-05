@@ -15,6 +15,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 
 const COLORS = {
   bg: "#F6F8F7",
@@ -194,10 +195,10 @@ export default function MidwifeSelectionScreen() {
             )}
           </View>
         </View>
-        
+
         {/* Arrow indicator */}
         <View style={styles.arrowContainer}>
-          <Text style={styles.arrow}>→</Text>
+          <Ionicons name="arrow-forward" size={20} color={COLORS.accent} />
         </View>
       </TouchableOpacity>
     );
@@ -252,7 +253,7 @@ export default function MidwifeSelectionScreen() {
             style={styles.clearBtn}
             onPress={() => setSearchQuery("")}
           >
-            <Text style={styles.clearBtnText}>✕</Text>
+            <Ionicons name="close" size={20} color={COLORS.dim} />
           </TouchableOpacity>
         )}
       </View>
@@ -393,11 +394,6 @@ const styles = StyleSheet.create({
     top: 14,
     padding: 4,
   },
-  clearBtnText: {
-    color: COLORS.dim,
-    fontSize: 16,
-    fontWeight: "600",
-  },
   statsContainer: {
     flexDirection: "row",
     paddingHorizontal: 20,
@@ -511,11 +507,6 @@ const styles = StyleSheet.create({
   },
   arrowContainer: {
     paddingLeft: 12,
-  },
-  arrow: {
-    fontSize: 20,
-    color: COLORS.accent,
-    fontWeight: "600",
   },
   errorContainer: {
     backgroundColor: "#FEE2E2",

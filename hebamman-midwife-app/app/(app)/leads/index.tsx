@@ -13,6 +13,7 @@ import {
   View,
   ActivityIndicator,
 } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 
 const COLORS = {
   bg: "#F6F8F7",
@@ -123,9 +124,7 @@ export default function LeadsScreen() {
               <View style={styles.modalHeader}>
                 <Text style={styles.modalTitle}>Lead Details</Text>
                 <TouchableOpacity onPress={() => setSelected(null)}>
-                  <Text style={{ fontWeight: "700", color: COLORS.dim }}>
-                    ✕
-                  </Text>
+                  <Ionicons name="close" size={24} color={COLORS.dim} />
                 </TouchableOpacity>
               </View>
               <Row label="Name" value={selected.fullName} />

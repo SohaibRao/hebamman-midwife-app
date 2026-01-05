@@ -11,6 +11,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 
 // ---- Leads hook & helpers ----
 import { Lead, leadAddress, leadDisplayDate, useLeads } from "@/hooks/useLeads";
@@ -395,7 +396,7 @@ export default function Dashboard() {
         </View>
 
         <View style={[styles.statCard, { backgroundColor: COLORS.warningLight }]}>
-          <Text style={styles.statIcon}>📅</Text>
+          <Ionicons name="calendar-outline" size={32} color={COLORS.warningDark} />
           {loadingAppointments ? (
             <ActivityIndicator size="small" color={COLORS.primary} style={{ marginTop: 8 }} />
           ) : (
@@ -525,19 +526,19 @@ export default function Dashboard() {
         <View style={styles.quickActionsGrid}>
           <Link href={{ pathname: "/(app)/appointments" } as any} asChild>
             <TouchableOpacity style={styles.quickActionBtn}>
-              <Text style={styles.quickActionIcon}>📅</Text>
+              <Ionicons name="calendar-outline" size={28} color={COLORS.primary} />
               <Text style={styles.quickActionText}>{de.dashboard.quickActionButtons.createAppointment}</Text>
             </TouchableOpacity>
           </Link>
           <Link href={{ pathname: "/(app)/patients" } as any} asChild>
             <TouchableOpacity style={styles.quickActionBtn}>
-              <Text style={styles.quickActionIcon}>👤</Text>
+              <Ionicons name="person-outline" size={28} color={COLORS.primary} />
               <Text style={styles.quickActionText}>{de.dashboard.quickActionButtons.addPatient}</Text>
             </TouchableOpacity>
           </Link>
           <Link href={{ pathname: "/(app)/requests" } as any} asChild>
             <TouchableOpacity style={styles.quickActionBtn}>
-              <Text style={styles.quickActionIcon}>📋</Text>
+              <Ionicons name="document-text-outline" size={28} color={COLORS.primary} />
               <Text style={styles.quickActionText}>{de.dashboard.quickActionButtons.checkRequests}</Text>
             </TouchableOpacity>
           </Link>
@@ -552,7 +553,7 @@ export default function Dashboard() {
               <View style={styles.modalHeader}>
                 <Text style={styles.modalTitle}>Lead-Details</Text>
                 <TouchableOpacity onPress={() => setSelectedLead(null)}>
-                  <Text style={{ fontWeight: "700", color: COLORS.textSecondary }}>✕</Text>
+                  <Ionicons name="close" size={24} color={COLORS.textSecondary} />
                 </TouchableOpacity>
               </View>
               <Detail label={de.common.name} value={selectedLead.fullName} />
