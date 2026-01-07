@@ -19,6 +19,7 @@ import { useMidwifeProfile } from "@/hooks/useMidwifeProfile";
 import { api } from "@/lib/api";
 import { COLORS, SPACING, BORDER_RADIUS, SHADOWS } from "@/constants/theme";
 import de from "@/constants/i18n";
+import AppointmentCard from "@/components/appointments/AppointmentCard";
 
 // Service colors
 const SERVICE_COLORS: Record<string, string> = {
@@ -383,19 +384,19 @@ export default function Dashboard() {
           <Text style={styles.statLabel}>{de.dashboard.stats.activePatients}</Text>
         </View>
 
-        <View style={[styles.statCard, { backgroundColor: COLORS.infoLight }]}>
+        <View style={[styles.statCard, { backgroundColor: COLORS.primaryLight }]}>
           <Text style={styles.statIcon}>📋</Text>
           <Text style={styles.statValue}>0</Text>
           <Text style={styles.statLabel}>{de.dashboard.stats.openRequests}</Text>
         </View>
 
-        <View style={[styles.statCard, { backgroundColor: COLORS.successLight }]}>
+        <View style={[styles.statCard, { backgroundColor: COLORS.primaryLight }]}>
           <Text style={styles.statIcon}>👶</Text>
           <Text style={styles.statValue}>0</Text>
           <Text style={styles.statLabel}>{de.dashboard.stats.birthsThisMonth}</Text>
         </View>
 
-        <View style={[styles.statCard, { backgroundColor: COLORS.warningLight }]}>
+        <View style={[styles.statCard, { backgroundColor: COLORS.primaryLight }]}>
           <Ionicons name="calendar-outline" size={32} color={COLORS.warningDark} />
           {loadingAppointments ? (
             <ActivityIndicator size="small" color={COLORS.primary} style={{ marginTop: 8 }} />
@@ -417,30 +418,34 @@ export default function Dashboard() {
           </Link>
         }
       />
-      <View style={styles.listCard}>
+      <View style={styles.appointmentsContainer}>
         {loadingAppointments && (
           <View style={{ paddingVertical: 20, alignItems: "center" }}>
             <ActivityIndicator size="small" color={COLORS.primary} />
           </View>
         )}
         {!loadingAppointments && upcomingApp5.length === 0 && (
-          <Text style={{ color: COLORS.textSecondary, paddingVertical: 12 }}>{de.dashboard.noAppointments}</Text>
+          <View style={styles.listCard}>
+            <Text style={{ color: COLORS.textSecondary, paddingVertical: 12 }}>{de.dashboard.noAppointments}</Text>
+          </View>
         )}
         {!loadingAppointments &&
-          upcomingApp5.map((a, i) => (
-            <View key={`${a.serviceCode}-${a.appointmentId}`} style={[styles.row, i > 0 && styles.rowDivider]}>
-              <View style={[styles.dot, { backgroundColor: codeColor(a.serviceCode) }]} />
-              <View style={{ flex: 1 }}>
-                <Text style={styles.rowTitle}>
-                  {a.serviceCode} • {SERVICE_NAMES[a.serviceCode] || a.serviceCode}
-                </Text>
-                <Text style={styles.rowSub}>{a.clientName || "Patient"}</Text>
-              </View>
-              <View style={{ alignItems: "flex-end" }}>
-                <Text style={styles.when}>{fmtDateShort(a.dateObj)}</Text>
-                <Text style={styles.slot}>{a.startTime}–{a.endTime} · {a.duration}{de.appointments.minutes}</Text>
-              </View>
-            </View>
+          upcomingApp5.map((a) => (
+            <AppointmentCard
+              key={`${a.serviceCode}-${a.appointmentId}`}
+              appointment={a}
+              patientName={a.clientName || "Patient"}
+              onPressDetails={() => {
+                router.push({
+                  pathname: "/(app)/appointments" as any,
+                });
+              }}
+              onPressEdit={() => {
+                router.push({
+                  pathname: "/(app)/appointments" as any,
+                });
+              }}
+            />
           ))}
       </View>
 
@@ -709,6 +714,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: SPACING.md,
     paddingVertical: SPACING.sm,
     ...SHADOWS.sm,
+    marginBottom: SPACING.lg,
+  },
+
+  appointmentsContainer: {
     marginBottom: SPACING.lg,
   },
 

@@ -3,12 +3,13 @@ import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
-  FlatList,
+  SectionList,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 import { useAuth } from "@/context/AuthContext";
 import { api } from "@/lib/api";
 import { useMidwifeProfile } from "@/hooks/useMidwifeProfile";
@@ -359,6 +360,45 @@ export default function AppointmentsScreen() {
     }
     return filtered;
   }, [allAppointments, listMonthKey, statusFilter]);
+
+  // Group appointments by date for section list
+  const appointmentSections = useMemo(() => {
+    const grouped: Record<string, UiApt[]> = {};
+
+    monthAppointments.forEach((apt) => {
+      const dateKey = toDMY(apt.dateObj);
+      if (!grouped[dateKey]) {
+        grouped[dateKey] = [];
+      }
+      grouped[dateKey].push(apt);
+    });
+
+    // Convert to section list format and sort by date
+    const sections = Object.keys(grouped)
+      .sort((a, b) => {
+        const dateA = toDate(a);
+        const dateB = toDate(b);
+        return dateA.getTime() - dateB.getTime();
+      })
+      .map((dateKey) => {
+        const dateObj = toDate(dateKey);
+        const dayName = dateObj.toLocaleDateString('de-DE', { weekday: 'short' });
+        const formattedDate = dateObj.toLocaleDateString('de-DE', {
+          day: '2-digit',
+          month: 'short',
+          year: '2-digit'
+        });
+
+        return {
+          title: `${dayName}., ${formattedDate}`,
+          dateKey,
+          count: grouped[dateKey].length,
+          data: grouped[dateKey],
+        };
+      });
+
+    return sections;
+  }, [monthAppointments]);
 
   // Calendar data
   const minDate = useMemo(
@@ -966,15 +1006,27 @@ export default function AppointmentsScreen() {
           </View>
 
           {/* Appointments List */}
-          <FlatList
-            data={monthAppointments}
+          <SectionList
+            sections={appointmentSections}
             keyExtractor={(item) => `${item.serviceCode}-${item.appointmentId}`}
             contentContainerStyle={styles.listContent}
+            stickySectionHeadersEnabled={false}
             ListEmptyComponent={
               <View style={[styles.center, { padding: 24 }]}>
                 <Text style={styles.emptyText}>No appointments this month.</Text>
               </View>
             }
+            renderSectionHeader={({ section }) => (
+              <View style={styles.sectionHeader}>
+                <View style={styles.sectionHeaderLeft}>
+                  <Ionicons name="calendar-outline" size={20} color={COLORS.primary} />
+                  <Text style={styles.sectionHeaderTitle}>{section.title}</Text>
+                </View>
+                <Text style={styles.sectionHeaderCount}>
+                  {section.count} {section.count === 1 ? 'Termin' : 'Termine'}
+                </Text>
+              </View>
+            )}
             renderItem={({ item }) => (
               <AppointmentCard
                 appointment={item}
@@ -1121,6 +1173,30 @@ const styles = StyleSheet.create({
   navBtnDisabled: { opacity: 0.4 },
   navBtnText: { color: COLORS.text, fontWeight: "700" },
   monthNavTitle: { fontSize: 18, fontWeight: "800", color: COLORS.text, textAlign: "center" },
-  listContent: { padding: SPACING.lg, gap: SPACING.sm },
+  listContent: { padding: SPACING.lg },
   emptyText: { color: COLORS.textSecondary, textAlign: "center" },
+  sectionHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingVertical: SPACING.md,
+    paddingHorizontal: SPACING.sm,
+    marginTop: SPACING.md,
+    marginBottom: SPACING.sm,
+  },
+  sectionHeaderLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: SPACING.sm,
+  },
+  sectionHeaderTitle: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: COLORS.text,
+  },
+  sectionHeaderCount: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: COLORS.textSecondary,
+  },
 });

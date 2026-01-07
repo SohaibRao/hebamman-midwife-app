@@ -6,46 +6,73 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { COLORS, SPACING, BORDER_RADIUS } from "@/constants/theme";
+import { Ionicons } from "@expo/vector-icons";
+import { COLORS, SPACING, BORDER_RADIUS, LOCATION_COLORS } from "@/constants/theme";
 import de from "@/constants/i18n";
 
-const SERVICE_COLORS: Record<string, string> = {
-  "A1/A2": COLORS.serviceA1A2,
-  B1: COLORS.serviceB1,
-  B2: COLORS.serviceB2,
-  E1: COLORS.serviceE1,
-  C1: COLORS.serviceC1,
-  C2: COLORS.serviceC2,
-  D1: COLORS.serviceD1,
-  D2: COLORS.serviceD2,
-  F1: COLORS.serviceF1,
+// Service type map - currently displaying codes as-is
+// Will be updated with exact naming in the future
+const SERVICE_TYPE_MAP: Record<string, string> = {
+  "A1/A2": "A1/A2",
+  B1: "B1",
+  B2: "B2",
+  E1: "E1",
+  C1: "C1",
+  C2: "C2",
+  D1: "D1",
+  D2: "D2",
+  F1: "F1",
 };
 
-const getStatusBadgeStyle = (status?: string) => {
-  const normalizedStatus = status?.toLowerCase() || "active";
-  const styles: Record<string, any> = {
-    active: {
-      backgroundColor: COLORS.successLight,
-      color: COLORS.success,
-    },
-    pending: {
-      backgroundColor: COLORS.warningLight,
-      color: COLORS.warning,
-    },
-    cancelled: {
-      backgroundColor: COLORS.errorLight,
-      color: COLORS.error,
-    },
+// Map service codes to location types
+const SERVICE_LOCATION_MAP: Record<string, string> = {
+  "A1/A2": "In persona/ In Video",
+  B1: "In persona",
+  B2: "In Video",
+  E1: "In persona",
+  C1: "In persona",
+  C2: "In Video",
+  D1: "In persona",
+  D2: "In Video",
+  F1: "In persona",
+};
+
+const getLocationBadge = (serviceCode: string) => {
+  const locationLabel = SERVICE_LOCATION_MAP[serviceCode] || "In persona";
+
+  // Determine badge color based on location type
+  let backgroundColor: string;
+  let textColor: string;
+  let icon: keyof typeof Ionicons.glyphMap;
+
+  if (locationLabel.includes("In persona") && locationLabel.includes("In Video")) {
+    // A1/A2 - Both options (use purple for hybrid)
+    backgroundColor = COLORS.locationVideocall;
+    textColor = COLORS.locationVideocallText;
+    icon = "people";
+  } else if (locationLabel === "In persona") {
+    // In person (use green)
+    backgroundColor = COLORS.locationHausbesuch;
+    textColor = COLORS.locationHausbesuchText;
+    icon = "person";
+  } else if (locationLabel === "In Video") {
+    // Video (use blue)
+    backgroundColor = COLORS.locationPraxis;
+    textColor = COLORS.locationPraxisText;
+    icon = "videocam";
+  } else {
+    // Default
+    backgroundColor = COLORS.locationPraxis;
+    textColor = COLORS.locationPraxisText;
+    icon = "help-circle";
+  }
+
+  return {
+    label: locationLabel,
+    icon,
+    backgroundColor,
+    textColor,
   };
-  return styles[normalizedStatus] || styles.active;
-};
-
-const getStatusLabel = (status?: string) => {
-  const normalizedStatus = status?.toLowerCase() || "active";
-  if (normalizedStatus === "active") return de.appointments.status.active;
-  if (normalizedStatus === "pending") return de.appointments.status.pending;
-  if (normalizedStatus === "cancelled") return de.appointments.status.cancelled;
-  return status?.toUpperCase() || "ACTIVE";
 };
 
 type UiApt = {
@@ -73,51 +100,47 @@ export default function AppointmentCard({
   onPressDetails,
   onPressEdit,
 }: Props) {
-  const codeColor = SERVICE_COLORS[appointment.serviceCode] ?? COLORS.textSecondary;
+  const locationBadge = getLocationBadge(appointment.serviceCode);
+  const appointmentType = SERVICE_TYPE_MAP[appointment.serviceCode] || appointment.serviceCode;
   const isCancelled = appointment.status?.toLowerCase() === "cancelled";
-  const statusStyle = getStatusBadgeStyle(appointment.status);
-
-  const dateStr = appointment.dateObj.toLocaleDateString('de-DE', {
-    weekday: "short",
-    day: "2-digit",
-    month: "short",
-  });
 
   return (
-    <View style={styles.card}>
-      <View style={[styles.dot, { backgroundColor: codeColor }]} />
-      <View style={styles.content}>
-        <View style={styles.headerRow}>
-          <Text style={styles.title}>
-            {appointment.serviceCode} • {patientName}
-          </Text>
-          <View
-            style={[
-              styles.statusBadge,
-              { backgroundColor: statusStyle.backgroundColor },
-            ]}
-          >
-            <Text style={[styles.statusBadgeText, { color: statusStyle.color }]}>
-              {getStatusLabel(appointment.status)}
-            </Text>
-          </View>
+    <TouchableOpacity
+      style={[styles.card, isCancelled && styles.cardCancelled]}
+      onPress={onPressDetails}
+      activeOpacity={0.7}
+    >
+      {/* Time on the left */}
+      <View style={styles.timeContainer}>
+        <Text style={styles.timeText}>{appointment.startTime}</Text>
+      </View>
+
+      {/* Patient info and appointment type */}
+      <View style={styles.infoContainer}>
+        <View style={styles.patientRow}>
+          <Ionicons name="person" size={16} color={COLORS.textSecondary} />
+          <Text style={styles.patientName}>{patientName}</Text>
         </View>
-        <Text style={styles.subtitle}>
-          {dateStr} • {appointment.startTime}–{appointment.endTime} •{" "}
-          {appointment.duration}{de.appointments.minutes}
+        <Text style={styles.appointmentType}>{appointmentType}</Text>
+      </View>
+
+      {/* Location badge on the right */}
+      <View
+        style={[
+          styles.locationBadge,
+          { backgroundColor: locationBadge.backgroundColor }
+        ]}
+      >
+        <Ionicons
+          name={locationBadge.icon}
+          size={14}
+          color={locationBadge.textColor}
+        />
+        <Text style={[styles.locationText, { color: locationBadge.textColor }]}>
+          {locationBadge.label}
         </Text>
       </View>
-      <View style={styles.actions}>
-        <TouchableOpacity onPress={onPressDetails} style={styles.detailsButton}>
-          <Text style={styles.detailsButtonText}>{de.actions.viewDetails}</Text>
-        </TouchableOpacity>
-        {!isCancelled && (
-          <TouchableOpacity onPress={onPressEdit} style={styles.editButton}>
-            <Text style={styles.editButtonText}>{de.actions.edit}</Text>
-          </TouchableOpacity>
-        )}
-      </View>
-    </View>
+    </TouchableOpacity>
   );
 }
 
@@ -125,69 +148,55 @@ const styles = StyleSheet.create({
   card: {
     flexDirection: "row",
     alignItems: "center",
-    paddingVertical: SPACING.md,
-    gap: SPACING.sm,
+    backgroundColor: COLORS.card,
+    borderRadius: BORDER_RADIUS.md,
+    padding: SPACING.lg,
+    marginBottom: SPACING.sm,
+    borderWidth: 1,
+    borderColor: COLORS.borderLight,
   },
-  dot: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    marginRight: SPACING.xs,
+  cardCancelled: {
+    opacity: 0.6,
   },
-  content: {
-    flex: 1,
+  timeContainer: {
+    marginRight: SPACING.lg,
   },
-  headerRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: SPACING.sm,
-    marginBottom: 4,
-  },
-  title: {
+  timeText: {
+    fontSize: 28,
     fontWeight: "700",
     color: COLORS.text,
-    fontSize: 15,
+    letterSpacing: -0.5,
   },
-  subtitle: {
+  infoContainer: {
+    flex: 1,
+    justifyContent: "center",
+  },
+  patientRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: SPACING.xs,
+    marginBottom: 4,
+  },
+  patientName: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: COLORS.text,
+  },
+  appointmentType: {
+    fontSize: 13,
     color: COLORS.textSecondary,
     marginTop: 2,
-    fontSize: 13,
   },
-  statusBadge: {
-    paddingHorizontal: SPACING.sm,
-    paddingVertical: 3,
-    borderRadius: BORDER_RADIUS.sm,
-  },
-  statusBadgeText: {
-    fontSize: 10,
-    fontWeight: "800",
-    letterSpacing: 0.5,
-  },
-  actions: {
-    gap: SPACING.sm,
-  },
-  detailsButton: {
-    borderWidth: 1,
-    borderColor: COLORS.primary,
+  locationBadge: {
+    flexDirection: "row",
+    alignItems: "center",
     paddingHorizontal: SPACING.md,
     paddingVertical: SPACING.sm,
     borderRadius: BORDER_RADIUS.sm,
-    backgroundColor: "transparent",
+    gap: 4,
   },
-  detailsButtonText: {
-    color: COLORS.primary,
-    fontWeight: "700",
-    fontSize: 12,
-  },
-  editButton: {
-    backgroundColor: COLORS.primary,
-    paddingHorizontal: SPACING.md,
-    paddingVertical: SPACING.sm,
-    borderRadius: BORDER_RADIUS.sm,
-  },
-  editButtonText: {
-    color: COLORS.background,
-    fontWeight: "700",
-    fontSize: 12,
+  locationText: {
+    fontSize: 11,
+    fontWeight: "600",
   },
 });

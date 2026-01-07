@@ -3,7 +3,7 @@ import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
-  FlatList,
+  SectionList,
   Modal,
   ScrollView,
   StyleSheet,
@@ -18,6 +18,7 @@ import { useAuth } from "@/context/AuthContext";
 import { COLORS, SPACING, BORDER_RADIUS } from "@/constants/theme";
 import de from "@/constants/i18n";
 import { Ionicons } from "@expo/vector-icons";
+import AppointmentCard from "@/components/appointments/AppointmentCard";
 
 // -------------------- Types --------------------
 type Apt = {
@@ -322,9 +323,9 @@ export default function PatientAppointmentsScreen() {
   const monthAppointments = useMemo(() => {
     const start = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
     const end = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0);
-    
+
     let filtered = allAppointments.filter(apt => apt.dateObj >= start && apt.dateObj <= end);
-    
+
     // Apply status filter
     if (statusFilter !== "all") {
       filtered = filtered.filter((a) => {
@@ -332,9 +333,48 @@ export default function PatientAppointmentsScreen() {
         return aptStatus === statusFilter;
       });
     }
-    
+
     return filtered;
   }, [allAppointments, currentDate, statusFilter]);
+
+  // Group appointments by date for section list
+  const appointmentSections = useMemo(() => {
+    const grouped: Record<string, Apt[]> = {};
+
+    monthAppointments.forEach((apt) => {
+      const dateKey = toDMY(apt.dateObj);
+      if (!grouped[dateKey]) {
+        grouped[dateKey] = [];
+      }
+      grouped[dateKey].push(apt);
+    });
+
+    // Convert to section list format and sort by date
+    const sections = Object.keys(grouped)
+      .sort((a, b) => {
+        const dateA = toDate(a);
+        const dateB = toDate(b);
+        return dateA.getTime() - dateB.getTime();
+      })
+      .map((dateKey) => {
+        const dateObj = toDate(dateKey);
+        const dayName = dateObj.toLocaleDateString('de-DE', { weekday: 'short' });
+        const formattedDate = dateObj.toLocaleDateString('de-DE', {
+          day: '2-digit',
+          month: 'short',
+          year: '2-digit'
+        });
+
+        return {
+          title: `${dayName}., ${formattedDate}`,
+          dateKey,
+          count: grouped[dateKey].length,
+          data: grouped[dateKey],
+        };
+      });
+
+    return sections;
+  }, [monthAppointments]);
 
   // Calendar days
   const calendarDays = useMemo(() => {
@@ -1022,40 +1062,34 @@ export default function PatientAppointmentsScreen() {
             </TouchableOpacity>
           </View>
 
-          <FlatList
-            data={monthAppointments}
+          <SectionList
+            sections={appointmentSections}
             keyExtractor={(item) => item.appointmentId}
-            contentContainerStyle={{ padding: 16, gap: 8 }}
+            contentContainerStyle={{ padding: 16 }}
+            stickySectionHeadersEnabled={false}
             ListEmptyComponent={
               <View style={[styles.center, { padding: 24 }]}>
                 <Text style={{ color: COLORS.textSecondary }}>Keine Termine in diesem Monat</Text>
               </View>
             }
-            renderItem={({ item }) => (
-              <TouchableOpacity onPress={() => openDetails(item)} style={styles.aptCard}>
-                <View style={[styles.colorDot, { backgroundColor: codeColor(item.serviceCode) }]} />
-                <View style={{ flex: 1 }}>
-                  <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 4 }}>
-                    <Text style={styles.aptTitle}>
-                      {item.serviceCode} • {de.serviceCodes[item.serviceCode as keyof typeof de.serviceCodes]}
-                    </Text>
-                    <View style={[
-                      styles.statusBadge,
-                      { backgroundColor: getStatusBadgeStyle(item.status).backgroundColor }
-                    ]}>
-                      <Text style={[
-                        styles.statusBadgeText,
-                        { color: getStatusBadgeStyle(item.status).color }
-                      ]}>
-                        {(item.status || "active").toUpperCase()}
-                      </Text>
-                    </View>
-                  </View>
-                  <Text style={styles.aptSub}>
-                    {fmtDateShort(item.dateObj)} • {item.startTime}–{item.endTime} • {item.duration}m
-                  </Text>
+            renderSectionHeader={({ section }) => (
+              <View style={styles.sectionHeader}>
+                <View style={styles.sectionHeaderLeft}>
+                  <Ionicons name="calendar-outline" size={20} color={COLORS.primary} />
+                  <Text style={styles.sectionHeaderTitle}>{section.title}</Text>
                 </View>
-              </TouchableOpacity>
+                <Text style={styles.sectionHeaderCount}>
+                  {section.count} {section.count === 1 ? 'Termin' : 'Termine'}
+                </Text>
+              </View>
+            )}
+            renderItem={({ item }) => (
+              <AppointmentCard
+                appointment={item}
+                patientName={patientName}
+                onPressDetails={() => openDetails(item)}
+                onPressEdit={() => openEdit(item)}
+              />
             )}
           />
         </>
@@ -1120,40 +1154,20 @@ export default function PatientAppointmentsScreen() {
             {selectedCalendarDate && (
               <View style={{ marginTop: 16 }}>
                 <Text style={styles.sectionTitle}>
-                  Appointments on {fmtDateShort(selectedCalendarDate)}
+                  Termine am {fmtDateShort(selectedCalendarDate)}
                 </Text>
                 {selectedDayAppointments.length === 0 ? (
                   <Text style={{ color: COLORS.textSecondary, marginTop: 8 }}>Keine Termine</Text>
                 ) : (
                   selectedDayAppointments.map((item) => (
-                    <TouchableOpacity
-                      key={item.appointmentId}
-                      onPress={() => openDetails(item)}
-                      style={[styles.aptCard, { marginTop: 8 }]}
-                    >
-                      <View style={[styles.colorDot, { backgroundColor: codeColor(item.serviceCode) }]} />
-                      <View style={{ flex: 1 }}>
-                        <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 4 }}>
-                          <Text style={styles.aptTitle}>
-                            {item.serviceCode} • {de.serviceCodes[item.serviceCode as keyof typeof de.serviceCodes]}
-                          </Text>
-                          <View style={[
-                            styles.statusBadge,
-                            { backgroundColor: getStatusBadgeStyle(item.status).backgroundColor }
-                          ]}>
-                            <Text style={[
-                              styles.statusBadgeText,
-                              { color: getStatusBadgeStyle(item.status).color }
-                            ]}>
-                              {(item.status || "active").toUpperCase()}
-                            </Text>
-                          </View>
-                        </View>
-                        <Text style={styles.aptSub}>
-                          {item.startTime}–{item.endTime} • {item.duration}m
-                        </Text>
-                      </View>
-                    </TouchableOpacity>
+                    <View key={item.appointmentId} style={{ marginTop: 8 }}>
+                      <AppointmentCard
+                        appointment={item}
+                        patientName={patientName}
+                        onPressDetails={() => openDetails(item)}
+                        onPressEdit={() => openEdit(item)}
+                      />
+                    </View>
                   ))
                 )}
               </View>
@@ -2216,5 +2230,29 @@ const styles = StyleSheet.create({
     color: "#92400E",
     fontWeight: "600",
     textAlign: "center",
+  },
+  sectionHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingVertical: SPACING.md,
+    paddingHorizontal: SPACING.sm,
+    marginTop: SPACING.md,
+    marginBottom: SPACING.sm,
+  },
+  sectionHeaderLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: SPACING.sm,
+  },
+  sectionHeaderTitle: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: COLORS.text,
+  },
+  sectionHeaderCount: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: COLORS.textSecondary,
   },
 });
