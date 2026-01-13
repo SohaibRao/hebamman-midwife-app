@@ -163,10 +163,13 @@ export default function PatientAppointmentsScreen() {
   
   const [preBirthApts, setPreBirthApts] = useState<Apt[]>([]);
   const [postBirthApts, setPostBirthApts] = useState<Apt[]>([]);
-  
+
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDetails, setSelectedDetails] = useState<Apt | null>(null);
   const [detailsOpen, setDetailsOpen] = useState(false);
+
+  // Patient booking data
+  const [patientCurrentPlan, setPatientCurrentPlan] = useState<string | null>(null);
   
   // Status filter
   const [statusFilter, setStatusFilter] = useState<string>("all");
@@ -219,24 +222,45 @@ export default function PatientAppointmentsScreen() {
     return all;
   }, [preBirthApts, postBirthApts]);
 
+  // Fetch patient booking data to get CurrentPlan
+  const fetchPatientBookingData = useCallback(async () => {
+    if (!midwifeId) return;
+
+    try {
+      const res = await api(`/api/public/midwifeBooking/${midwifeId}`);
+      const json = await readJsonSafe<any>(res);
+
+      if (json.success && json.data && Array.isArray(json.data)) {
+        // Find the patient with matching userId (clientId)
+        const patient = json.data.find((p: any) => p.userId === clientId);
+        if (patient && patient.CurrentPlan) {
+          setPatientCurrentPlan(patient.CurrentPlan);
+        }
+      }
+    } catch (e: any) {
+      console.error("Failed to fetch patient booking data:", e);
+      // Don't set error state as this shouldn't block the main functionality
+    }
+  }, [midwifeId, clientId]);
+
   // Fetch appointments
   const fetchAppointments = useCallback(async () => {
     if (!midwifeId || !clientId) return;
-    
+
     setLoading(true);
     setError(null);
-    
+
     try {
       const preRes = await api(
         `/api/public/PreBirthAppointments/clientAppointment?midwifeId=${midwifeId}&clientId=${clientId}`
       );
       const preJson = await readJsonSafe<any>(preRes);
-      
+
       const postRes = await api(
         `/api/public/PostBirthAppointments/clientAppointment?midwifeId=${midwifeId}&clientId=${clientId}`
       );
       const postJson = await readJsonSafe<any>(postRes);
-      
+
       const preApts: Apt[] = [];
       if (preJson.success && preJson.data?.appointments) {
         Object.entries(preJson.data.appointments).forEach(([serviceCode, apts]: [string, any]) => {
@@ -259,7 +283,7 @@ export default function PatientAppointmentsScreen() {
           }
         });
       }
-      
+
       const postApts: Apt[] = [];
       if (postJson.success && postJson.data?.appointments) {
         Object.entries(postJson.data.appointments).forEach(([serviceCode, apts]: [string, any]) => {
@@ -282,7 +306,7 @@ export default function PatientAppointmentsScreen() {
           }
         });
       }
-      
+
       setPreBirthApts(preApts);
       setPostBirthApts(postApts);
     } catch (e: any) {
@@ -293,8 +317,9 @@ export default function PatientAppointmentsScreen() {
   }, [midwifeId, clientId]);
 
   useEffect(() => {
+    fetchPatientBookingData();
     fetchAppointments();
-  }, [fetchAppointments]);
+  }, [fetchPatientBookingData, fetchAppointments]);
 
   // Calculate status counts for current month
   const statusCounts = useMemo(() => {
@@ -412,8 +437,23 @@ export default function PatientAppointmentsScreen() {
     return apptsByDay[key] ?? [];
   }, [selectedCalendarDate, apptsByDay]);
 
-  // Available service codes (F1 excluded from creation)
-  const availableServiceCodes = ["B1", "B2", "C1", "C2", "D1", "D2"];
+  // Available service codes based on patient's current plan
+  const availableServiceCodes = useMemo(() => {
+    if (!patientCurrentPlan) {
+      // If CurrentPlan is not loaded yet, show all options
+      return ["B1", "B2", "C1", "C2", "D1", "D2"];
+    }
+
+    // Filter based on CurrentPlan
+    if (patientCurrentPlan.toLowerCase() === "prebirth") {
+      return ["B1", "B2"];
+    } else if (patientCurrentPlan.toLowerCase() === "postbirth") {
+      return ["C1", "C2", "D1", "D2"];
+    }
+
+    // Default to all if CurrentPlan value is unexpected
+    return ["B1", "B2", "C1", "C2", "D1", "D2"];
+  }, [patientCurrentPlan]);
 
   const generateTimeOptions = (): string[] => {
     const times: string[] = [];
