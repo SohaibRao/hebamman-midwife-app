@@ -60,7 +60,8 @@ const sameDay = (a: Date, b: Date) =>
   a.getDate() === b.getDate();
 
 const weekdayName = (d: Date) => {
-  const days = ["Sonntag", "Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag"];
+  // Use English names to match the timetable structure
+  const days = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
   return days[d.getDay()];
 };
 

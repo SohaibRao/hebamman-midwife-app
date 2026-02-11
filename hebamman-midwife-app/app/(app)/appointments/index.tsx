@@ -89,7 +89,11 @@ const toDate = (dmy: string) => {
 
 const pad2 = (n: number) => (n < 10 ? `0${n}` : `${n}`);
 const toDMY = (d: Date) => `${pad2(d.getDate())}/${pad2(d.getMonth() + 1)}/${d.getFullYear()}`;
-const weekdayName = (d: Date) => d.toLocaleDateString(undefined, { weekday: "long" });
+const weekdayName = (d: Date) => {
+  // Use English names to match the timetable structure
+  const days = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+  return days[d.getDay()];
+};
 const monthKeyOf = (d: Date): MonthKey => `${d.getMonth() + 1}/${d.getFullYear()}`;
 const monthTitle = (y: number, m0: number) =>
   new Date(y, m0, 1).toLocaleDateString(undefined, { month: "long", year: "numeric" });
