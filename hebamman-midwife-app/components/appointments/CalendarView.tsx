@@ -1,5 +1,5 @@
 // components/appointments/CalendarView.tsx
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import {
   Dimensions,
   FlatList,
@@ -78,6 +78,7 @@ type Props = {
   onPressAppt: (apt: UiApt) => void;
   onPressEdit: (apt: UiApt) => void;
   getPatientName: (clientId?: string) => string;
+  initialMonthIndex?: number;
 };
 
 export default function CalendarView({
@@ -86,10 +87,25 @@ export default function CalendarView({
   onPressAppt,
   onPressEdit,
   getPatientName,
+  initialMonthIndex = 0,
 }: Props) {
   const flatListRef = useRef<FlatList>(null);
-  const [index, setIndex] = useState(0);
+  const [index, setIndex] = useState(initialMonthIndex);
   const viewConfigRef = useRef({ viewAreaCoveragePercentThreshold: 50 });
+
+  // Scroll to initial month when component mounts or when initialMonthIndex changes
+  useEffect(() => {
+    if (months.length > 0 && initialMonthIndex >= 0 && initialMonthIndex < months.length) {
+      setIndex(initialMonthIndex);
+      // Use setTimeout to ensure FlatList is ready
+      setTimeout(() => {
+        flatListRef.current?.scrollToIndex({
+          index: initialMonthIndex,
+          animated: false
+        });
+      }, 100);
+    }
+  }, [initialMonthIndex, months.length]);
 
   const onViewRef = useRef((viewableItems: any) => {
     if (viewableItems.viewableItems.length > 0) {
@@ -198,6 +214,10 @@ function MonthCard({
   const selectedKey = selected ? toDMY(selected) : null;
   const list = selectedKey ? apptsByDay[selectedKey] ?? [] : [];
 
+  // Get today's date for comparison
+  const today = new Date();
+  const todayKey = toDMY(today);
+
   const handleDatePress = (date: Date) => {
     const key = toDMY(date);
     const dayApts = apptsByDay[key] ?? [];
@@ -229,6 +249,7 @@ function MonthCard({
             const d = new Date(year, monthIndex, idx + 1);
             const key = toDMY(d);
             const dayApts = apptsByDay[key] ?? [];
+            const isToday = key === todayKey;
 
             return (
               <TouchableOpacity
@@ -236,6 +257,7 @@ function MonthCard({
                 style={[
                   styles.gridCell,
                   dayApts.length > 0 && styles.gridCellWithApts,
+                  isToday && styles.gridCellToday,
                 ]}
                 onPress={() => handleDatePress(d)}
                 disabled={dayApts.length === 0}
@@ -244,6 +266,7 @@ function MonthCard({
                   style={[
                     styles.gridDay,
                     dayApts.length > 0 && styles.gridDayWithApts,
+                    isToday && styles.gridDayToday,
                   ]}
                 >
                   {idx + 1}
@@ -477,6 +500,15 @@ const styles = StyleSheet.create({
   },
   gridDayWithApts: {
     fontWeight: "800",
+    color: COLORS.accent,
+  },
+  gridCellToday: {
+    borderWidth: 2,
+    borderColor: COLORS.accent,
+    backgroundColor: "#D4E8DF",
+  },
+  gridDayToday: {
+    fontWeight: "900",
     color: COLORS.accent,
   },
   dotRow: {

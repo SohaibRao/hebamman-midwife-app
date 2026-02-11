@@ -127,6 +127,8 @@ export const de = {
     title: 'Termine',
     listView: 'Liste',
     calendarView: 'Kalender',
+    upcoming: 'Bevorstehend',
+    past: 'Vergangen',
     filter: {
       all: 'Alle',
       active: 'Aktiv',

@@ -201,6 +201,7 @@ export default function AppointmentsScreen() {
   );
 
   // Filter State
+  const [timeFilter, setTimeFilter] = useState<"upcoming" | "past" | "all">("upcoming");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [listMonthIndex, setListMonthIndex] = useState<number>(0);
 
@@ -309,35 +310,73 @@ export default function AppointmentsScreen() {
     return out;
   }, [monthly]);
 
-  // Month list for navigation
+  // Filter appointments by time (upcoming/past/all)
+  const timeFilteredAppointments = useMemo(() => {
+    const now = new Date();
+    now.setHours(0, 0, 0, 0);
+
+    if (timeFilter === "upcoming") {
+      // Upcoming: today and future (ascending order)
+      return allAppointments.filter(apt => apt.dateObj >= now);
+    } else if (timeFilter === "past") {
+      // Past: before today (descending order - most recent first)
+      return allAppointments
+        .filter(apt => apt.dateObj < now)
+        .reverse();
+    } else {
+      // All: show all appointments
+      return allAppointments;
+    }
+  }, [allAppointments, timeFilter]);
+
+  // Month list for navigation (based on time-filtered appointments)
   const monthList = useMemo(() => {
-    const keys = Object.keys(monthly);
-    const parsed = keys
+    const monthSet = new Set<string>();
+    timeFilteredAppointments.forEach((apt) => {
+      monthSet.add(monthKeyOf(apt.dateObj));
+    });
+
+    const parsed = Array.from(monthSet)
       .map((k) => {
         const [m, y] = k.split("/").map((n) => parseInt(n, 10));
         return { key: k, y, m0: m - 1 };
       })
-      .sort((a, b) => (a.y === b.y ? a.m0 - b.m0 : a.y - b.y));
+      .sort((a, b) => {
+        if (timeFilter === "past") {
+          // For past appointments, show most recent month first
+          return a.y === b.y ? b.m0 - a.m0 : b.y - a.y;
+        } else {
+          // For upcoming/all, show chronologically
+          return a.y === b.y ? a.m0 - b.m0 : a.y - b.y;
+        }
+      });
     return parsed;
-  }, [monthly]);
+  }, [timeFilteredAppointments, timeFilter]);
 
   const initialMonthIndex = useMemo(() => {
     if (monthList.length === 0) return 0;
     const today = new Date();
-    const idx = monthList.findIndex(
-      (x) => x.y === today.getFullYear() && x.m0 === today.getMonth()
-    );
-    return idx >= 0 ? idx : 0;
-  }, [monthList]);
+
+    if (timeFilter === "upcoming" || timeFilter === "all") {
+      // For upcoming/all, try to find current month or first future month
+      const idx = monthList.findIndex(
+        (x) => x.y === today.getFullYear() && x.m0 === today.getMonth()
+      );
+      return idx >= 0 ? idx : 0;
+    } else {
+      // For past, start from the most recent past month (index 0)
+      return 0;
+    }
+  }, [monthList, timeFilter]);
 
   useEffect(() => setListMonthIndex(initialMonthIndex), [initialMonthIndex]);
 
   const listMonthKey = monthList[listMonthIndex]?.key;
 
-  // Calculate status counts
+  // Calculate status counts (based on time-filtered appointments)
   const statusCounts = useMemo(() => {
     if (!listMonthKey) return { all: 0, active: 0, pending: 0, cancelled: 0 };
-    const monthApts = allAppointments.filter((a) => monthKeyOf(a.dateObj) === listMonthKey);
+    const monthApts = timeFilteredAppointments.filter((a) => monthKeyOf(a.dateObj) === listMonthKey);
     return {
       all: monthApts.length,
       active: monthApts.filter((a) => (a.status?.toLowerCase() || "active") === "active").length,
@@ -346,12 +385,12 @@ export default function AppointmentsScreen() {
       cancelled: monthApts.filter((a) => (a.status?.toLowerCase() || "active") === "cancelled")
         .length,
     };
-  }, [allAppointments, listMonthKey]);
+  }, [timeFilteredAppointments, listMonthKey]);
 
   // Filtered appointments for list view
   const monthAppointments = useMemo(() => {
     if (!listMonthKey) return [];
-    let filtered = allAppointments.filter((a) => monthKeyOf(a.dateObj) === listMonthKey);
+    let filtered = timeFilteredAppointments.filter((a) => monthKeyOf(a.dateObj) === listMonthKey);
     if (statusFilter !== "all") {
       filtered = filtered.filter((a) => {
         const aptStatus = a.status?.toLowerCase() || "active";
@@ -359,7 +398,7 @@ export default function AppointmentsScreen() {
       });
     }
     return filtered;
-  }, [allAppointments, listMonthKey, statusFilter]);
+  }, [timeFilteredAppointments, listMonthKey, statusFilter]);
 
   // Group appointments by date for section list
   const appointmentSections = useMemo(() => {
@@ -435,6 +474,15 @@ export default function AppointmentsScreen() {
     }
     return arr;
   }, [minDate, maxDate]);
+
+  // Get current month index for calendar initial scroll
+  const currentMonthIndex = useMemo(() => {
+    const today = new Date();
+    const idx = calendarMonths.findIndex(
+      (month) => month.y === today.getFullYear() && month.m === today.getMonth()
+    );
+    return idx >= 0 ? idx : 0;
+  }, [calendarMonths]);
 
   const apptsByDay = useMemo(() => {
     const m: Record<string, UiApt[]> = {};
@@ -972,6 +1020,36 @@ export default function AppointmentsScreen() {
         </View>
       ) : tab === "list" ? (
         <>
+          {/* Time Filter */}
+          <View style={styles.timeFilterContainer}>
+            <View style={styles.timeFilterTabs}>
+              <TouchableOpacity
+                onPress={() => setTimeFilter("upcoming")}
+                style={[styles.timeFilterTab, timeFilter === "upcoming" && styles.timeFilterTabActive]}
+              >
+                <Text style={[styles.timeFilterTabText, timeFilter === "upcoming" && styles.timeFilterTabTextActive]}>
+                  {de.appointments.upcoming}
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => setTimeFilter("past")}
+                style={[styles.timeFilterTab, timeFilter === "past" && styles.timeFilterTabActive]}
+              >
+                <Text style={[styles.timeFilterTabText, timeFilter === "past" && styles.timeFilterTabTextActive]}>
+                  {de.appointments.past}
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => setTimeFilter("all")}
+                style={[styles.timeFilterTab, timeFilter === "all" && styles.timeFilterTabActive]}
+              >
+                <Text style={[styles.timeFilterTabText, timeFilter === "all" && styles.timeFilterTabTextActive]}>
+                  {de.common.all}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+
           {/* Status Filter */}
           <StatusFilter
             selectedFilter={statusFilter}
@@ -1044,6 +1122,7 @@ export default function AppointmentsScreen() {
           onPressAppt={openDetails}
           onPressEdit={openEdit}
           getPatientName={getPatientName}
+          initialMonthIndex={currentMonthIndex}
         />
       )}
 
@@ -1162,6 +1241,37 @@ const styles = StyleSheet.create({
   },
   bulkCancelText: { color: COLORS.error, fontWeight: "800" },
   metaText: { color: COLORS.textSecondary, fontSize: 12, fontWeight: "600" },
+  timeFilterContainer: {
+    paddingHorizontal: SPACING.lg,
+    paddingTop: SPACING.sm,
+    paddingBottom: SPACING.md,
+    backgroundColor: COLORS.background,
+  },
+  timeFilterTabs: {
+    flexDirection: "row",
+    backgroundColor: COLORS.backgroundGray,
+    borderRadius: BORDER_RADIUS.md,
+    padding: 4,
+    gap: 4,
+  },
+  timeFilterTab: {
+    flex: 1,
+    paddingVertical: SPACING.sm,
+    paddingHorizontal: SPACING.md,
+    borderRadius: BORDER_RADIUS.sm,
+    alignItems: "center",
+  },
+  timeFilterTabActive: {
+    backgroundColor: COLORS.primary,
+  },
+  timeFilterTabText: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: COLORS.textSecondary,
+  },
+  timeFilterTabTextActive: {
+    color: COLORS.background,
+  },
   monthNav: {
     paddingHorizontal: SPACING.lg,
     marginBottom: SPACING.sm,
