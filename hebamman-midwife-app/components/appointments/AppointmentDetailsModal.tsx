@@ -95,13 +95,10 @@ export default function AppointmentDetailsModal({
                 <Text style={styles.primaryButtonText}>{de.actions.edit}</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                onPress={() => {
-                  onClose();
-                  onCancel(appointment);
-                }}
-                style={styles.cancelButton}
+                onPress={onClose}
+                style={styles.secondaryButton}
               >
-                <Text style={styles.cancelButtonText}>{de.actions.cancel}</Text>
+                <Text style={styles.secondaryButtonText}>{de.actions.cancel}</Text>
               </TouchableOpacity>
             </View>
           )}
