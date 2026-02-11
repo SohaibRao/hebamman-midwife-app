@@ -178,7 +178,11 @@ export default function Dashboard() {
   // Fetch leads
   const { upcoming, loading: leadsLoading } = useLeads(midwifeId);
   const [selectedLead, setSelectedLead] = React.useState<Lead | null>(null);
-  const upcomingLeads5 = React.useMemo(() => upcoming.slice(0, 5), [upcoming]);
+
+  // Expandable sections state
+  const [appointmentsExpanded, setAppointmentsExpanded] = useState(false);
+  const [leadsExpanded, setLeadsExpanded] = useState(false);
+  const [patientsExpanded, setPatientsExpanded] = useState(false);
 
   // Fetch patients
   const [patients, setPatients] = useState<Patient[]>([]);
@@ -186,12 +190,12 @@ export default function Dashboard() {
 
   const fetchPatients = useCallback(async () => {
     if (!midwifeId) return;
-    
+
     setLoadingPatients(true);
     try {
       const res = await api(`/api/public/midwifeBooking/${midwifeId}`);
       const json = await res.json();
-      
+
       if (json.success) {
         setPatients(json.data || []);
       }
@@ -202,23 +206,52 @@ export default function Dashboard() {
     }
   }, [midwifeId]);
 
+  // Fetch open requests
+  const [openRequestsCount, setOpenRequestsCount] = useState(0);
+  const [loadingRequests, setLoadingRequests] = useState(false);
+
+  const fetchOpenRequests = useCallback(async () => {
+    if (!midwifeId) return;
+
+    setLoadingRequests(true);
+    try {
+      const res = await api(`/api/public/clientRequest?midwifeId=${midwifeId}`);
+      const json = await res.json();
+
+      if (json.success && json.data) {
+        const pendingCount = json.data.filter((r: any) => r.status === "pending").length;
+        setOpenRequestsCount(pendingCount);
+      }
+    } catch (e: any) {
+      console.error("Error fetching requests:", e);
+    } finally {
+      setLoadingRequests(false);
+    }
+  }, [midwifeId]);
+
   useEffect(() => {
     if (midwifeId) {
       fetchPatients();
+      fetchOpenRequests();
     }
-  }, [midwifeId, fetchPatients]);
+  }, [midwifeId, fetchPatients, fetchOpenRequests]);
 
   // Active patients count (converted status)
   const activePatientsCount = useMemo(() => {
     return patients.filter(p => p.clientStatus === "converted").length;
   }, [patients]);
 
-  // Latest 5 active patients
-  const activePatients5 = useMemo(() => {
-    return patients
-      .filter(p => p.clientStatus === "converted")
-      .slice(0, 5);
-  }, [patients]);
+  // Active patients to display (expandable)
+  const displayedActivePatients = useMemo(() => {
+    const activePatients = patients.filter(p => p.clientStatus === "converted");
+    const result = patientsExpanded ? activePatients.slice(0, 5) : activePatients.slice(0, 2);
+    console.log('displayedActivePatients recalculated:', {
+      totalActive: activePatients.length,
+      expanded: patientsExpanded,
+      displayedCount: result.length
+    });
+    return result;
+  }, [patients, patientsExpanded]);
 
   // Fetch appointments
   const clientET = useMemo(() => new Date(), []);
@@ -301,15 +334,38 @@ export default function Dashboard() {
     }
   }, [midwifeId, fetchAppointments]);
 
-  // Get upcoming 5 appointments (future dates only)
-  const upcomingApp5 = useMemo(() => {
+  // Get upcoming appointments count
+  const upcomingAppointmentsCount = useMemo(() => {
     const now = new Date();
     now.setHours(0, 0, 0, 0);
-    
-    return appointments
-      .filter(apt => apt.dateObj >= now)
-      .slice(0, 5);
+    return appointments.filter(apt => apt.dateObj >= now).length;
   }, [appointments]);
+
+  // Get upcoming appointments (future dates only, expandable)
+  const displayedAppointments = useMemo(() => {
+    const now = new Date();
+    now.setHours(0, 0, 0, 0);
+
+    const upcomingAppts = appointments.filter(apt => apt.dateObj >= now);
+    const result = appointmentsExpanded ? upcomingAppts.slice(0, 5) : upcomingAppts.slice(0, 2);
+    console.log('displayedAppointments recalculated:', {
+      totalUpcoming: upcomingAppts.length,
+      expanded: appointmentsExpanded,
+      displayedCount: result.length
+    });
+    return result;
+  }, [appointments, appointmentsExpanded]);
+
+  // Get upcoming leads to display (expandable)
+  const displayedLeads = useMemo(() => {
+    const result = leadsExpanded ? upcoming.slice(0, 5) : upcoming.slice(0, 2);
+    console.log('displayedLeads recalculated:', {
+      totalLeads: upcoming.length,
+      expanded: leadsExpanded,
+      displayedCount: result.length
+    });
+    return result;
+  }, [upcoming, leadsExpanded]);
 
   const navigateToPatient = (patient: Patient) => {
     router.push({
@@ -374,7 +430,10 @@ export default function Dashboard() {
 
       {/* Stats Grid */}
       <View style={styles.statsGrid}>
-        <View style={[styles.statCard, { backgroundColor: COLORS.primaryLight }]}>
+        <TouchableOpacity
+          style={[styles.statCard, { backgroundColor: COLORS.primaryLight }]}
+          onPress={() => router.push("/(app)/patients" as any)}
+        >
           <Text style={styles.statIcon}>👥</Text>
           {loadingPatients ? (
             <ActivityIndicator size="small" color={COLORS.primary} style={{ marginTop: 8 }} />
@@ -382,151 +441,48 @@ export default function Dashboard() {
             <Text style={styles.statValue}>{activePatientsCount}</Text>
           )}
           <Text style={styles.statLabel}>{de.dashboard.stats.activePatients}</Text>
-        </View>
+        </TouchableOpacity>
 
-        <View style={[styles.statCard, { backgroundColor: COLORS.primaryLight }]}>
+        <TouchableOpacity
+          style={[styles.statCard, { backgroundColor: COLORS.primaryLight }]}
+          onPress={() => router.push("/(app)/requests" as any)}
+        >
           <Text style={styles.statIcon}>📋</Text>
-          <Text style={styles.statValue}>0</Text>
+          {loadingRequests ? (
+            <ActivityIndicator size="small" color={COLORS.primary} style={{ marginTop: 8 }} />
+          ) : (
+            <Text style={styles.statValue}>{openRequestsCount}</Text>
+          )}
           <Text style={styles.statLabel}>{de.dashboard.stats.openRequests}</Text>
-        </View>
+        </TouchableOpacity>
 
-        <View style={[styles.statCard, { backgroundColor: COLORS.primaryLight }]}>
+        <TouchableOpacity
+          style={[styles.statCard, { backgroundColor: COLORS.primaryLight }]}
+          onPress={() => {
+            // Will be implemented later when API is available
+          }}
+        >
           <Text style={styles.statIcon}>👶</Text>
           <Text style={styles.statValue}>0</Text>
           <Text style={styles.statLabel}>{de.dashboard.stats.birthsThisMonth}</Text>
-        </View>
+        </TouchableOpacity>
 
-        <View style={[styles.statCard, { backgroundColor: COLORS.primaryLight }]}>
+        <TouchableOpacity
+          style={[styles.statCard, { backgroundColor: COLORS.primaryLight }]}
+          onPress={() => router.push("/(app)/appointments" as any)}
+        >
           <Ionicons name="calendar-outline" size={32} color={COLORS.warningDark} />
           {loadingAppointments ? (
             <ActivityIndicator size="small" color={COLORS.primary} style={{ marginTop: 8 }} />
           ) : (
-            <Text style={styles.statValue}>{upcomingApp5.length}</Text>
+            <Text style={styles.statValue}>{upcomingAppointmentsCount}</Text>
           )}
           <Text style={styles.statLabel}>{de.dashboard.stats.appointmentsToday}</Text>
-        </View>
-      </View>
-
-      {/* Today's Appointments */}
-      <SectionHeader
-        title={de.dashboard.todaysAppointments}
-        action={
-          <Link href={{ pathname: "/(app)/appointments" } as any} asChild>
-            <TouchableOpacity style={styles.linkBtn}>
-              <Text style={styles.linkBtnText}>{de.dashboard.viewAll}</Text>
-            </TouchableOpacity>
-          </Link>
-        }
-      />
-      <View style={styles.appointmentsContainer}>
-        {loadingAppointments && (
-          <View style={{ paddingVertical: 20, alignItems: "center" }}>
-            <ActivityIndicator size="small" color={COLORS.primary} />
-          </View>
-        )}
-        {!loadingAppointments && upcomingApp5.length === 0 && (
-          <View style={styles.listCard}>
-            <Text style={{ color: COLORS.textSecondary, paddingVertical: 12 }}>{de.dashboard.noAppointments}</Text>
-          </View>
-        )}
-        {!loadingAppointments &&
-          upcomingApp5.map((a) => (
-            <AppointmentCard
-              key={`${a.serviceCode}-${a.appointmentId}`}
-              appointment={a}
-              patientName={a.clientName || "Patient"}
-              onPressDetails={() => {
-                router.push({
-                  pathname: "/(app)/appointments" as any,
-                });
-              }}
-              onPressEdit={() => {
-                router.push({
-                  pathname: "/(app)/appointments" as any,
-                });
-              }}
-            />
-          ))}
-      </View>
-
-      {/* A1/A2 Consultation (Leads) */}
-      <SectionHeader
-        title="A1/A2 Beratungen (Leads)"
-        action={
-          <Link href={{ pathname: "/(app)/leads" } as any} asChild>
-            <TouchableOpacity style={styles.linkBtn}>
-              <Text style={styles.linkBtnText}>{de.dashboard.viewAll}</Text>
-            </TouchableOpacity>
-          </Link>
-        }
-      />
-      <View style={styles.listCard}>
-        {leadsLoading && <Text style={{ color: COLORS.textSecondary }}>{de.common.loading}</Text>}
-        {!leadsLoading && upcomingLeads5.length === 0 && (
-          <Text style={{ color: COLORS.textSecondary }}>Keine bevorstehenden Leads.</Text>
-        )}
-        {!leadsLoading &&
-          upcomingLeads5.map((lead, i) => (
-            <Pressable
-              key={lead._id}
-              onPress={() => setSelectedLead(lead)}
-              style={[styles.row, i > 0 && styles.rowDivider]}
-            >
-              <View style={{ flex: 1 }}>
-                <Text style={styles.rowTitle}>{lead.fullName}</Text>
-                <Text style={styles.rowSub}>{lead.email} · {lead.phoneNumber}</Text>
-                <Text style={styles.rowSubSmall}>{leadAddress(lead)}</Text>
-              </View>
-              <View style={{ alignItems: "flex-end" }}>
-                <Text style={styles.when}>{leadDisplayDate(lead)}</Text>
-                <Text style={styles.slot}>{lead.selectedSlot ?? "—"}</Text>
-              </View>
-            </Pressable>
-          ))}
-      </View>
-
-      {/* Active Patients (Latest 5) */}
-      <SectionHeader
-        title={de.patients.title}
-        action={
-          <Link href={{ pathname: "/(app)/patients" } as any} asChild>
-            <TouchableOpacity style={styles.linkBtn}>
-              <Text style={styles.linkBtnText}>{de.dashboard.viewAll}</Text>
-            </TouchableOpacity>
-          </Link>
-        }
-      />
-      <View style={styles.listCard}>
-        {loadingPatients && (
-          <View style={{ paddingVertical: 20, alignItems: "center" }}>
-            <ActivityIndicator size="small" color={COLORS.primary} />
-          </View>
-        )}
-        {!loadingPatients && activePatients5.length === 0 && (
-          <Text style={{ color: COLORS.textSecondary, paddingVertical: 12 }}>{de.patients.noPatients}</Text>
-        )}
-        {!loadingPatients &&
-          activePatients5.map((patient, i) => (
-            <TouchableOpacity
-              key={patient._id}
-              style={[styles.row, i > 0 && styles.rowDivider]}
-            >
-              <View style={{ flex: 1 }}>
-                <Text style={styles.rowTitle}>{patient.fullName}</Text>
-                <Text style={styles.rowSub}>{patient.email}</Text>
-                <Text style={styles.rowSubSmall}>{patient.phoneNumber}</Text>
-              </View>
-              <View style={{ alignItems: "flex-end" }}>
-                <View style={styles.badge}>
-                  <Text style={styles.badgeText}>{de.patients.status.schwanger}</Text>
-                </View>
-              </View>
-            </TouchableOpacity>
-          ))}
+        </TouchableOpacity>
       </View>
 
       {/* Quick Actions */}
-      <View style={{ marginTop: SPACING.lg }}>
+      <View style={{ marginTop: SPACING.md, marginBottom: SPACING.lg }}>
         <Text style={styles.sectionTitle}>{de.dashboard.quickActions}</Text>
         <View style={styles.quickActionsGrid}>
           <Link href={{ pathname: "/(app)/appointments" } as any} asChild>
@@ -548,6 +504,234 @@ export default function Dashboard() {
             </TouchableOpacity>
           </Link>
         </View>
+      </View>
+
+      {/* Today's Appointments */}
+      <SectionHeader
+        title={de.dashboard.todaysAppointments}
+        action={
+          <Link href={{ pathname: "/(app)/appointments" } as any} asChild>
+            <TouchableOpacity style={styles.linkBtn}>
+              <Text style={styles.linkBtnText}>{de.dashboard.viewAll}</Text>
+            </TouchableOpacity>
+          </Link>
+        }
+      />
+      <View style={styles.appointmentsContainer}>
+        {loadingAppointments && (
+          <View style={{ paddingVertical: 20, alignItems: "center" }}>
+            <ActivityIndicator size="small" color={COLORS.primary} />
+          </View>
+        )}
+        {!loadingAppointments && displayedAppointments.length === 0 && (
+          <View style={styles.listCard}>
+            <Text style={{ color: COLORS.textSecondary, paddingVertical: 12 }}>{de.dashboard.noAppointments}</Text>
+          </View>
+        )}
+        {!loadingAppointments && displayedAppointments.length > 0 && (
+          <>
+            {displayedAppointments.map((a) => (
+              <AppointmentCard
+                key={`${a.serviceCode}-${a.appointmentId}`}
+                appointment={a}
+                patientName={a.clientName || "Patient"}
+                onPressDetails={() => {
+                  router.push({
+                    pathname: "/(app)/appointments" as any,
+                  });
+                }}
+                onPressEdit={() => {
+                  router.push({
+                    pathname: "/(app)/appointments" as any,
+                  });
+                }}
+              />
+            ))}
+            <View style={styles.listCard}>
+              <View style={styles.expandButtonContainer}>
+                {!appointmentsExpanded && upcomingAppointmentsCount > 2 && (
+                  <TouchableOpacity
+                    style={styles.expandButton}
+                    onPress={() => {
+                      console.log('Expanding appointments');
+                      setAppointmentsExpanded(true);
+                    }}
+                  >
+                    <Text style={styles.expandButtonText}>Mehr anzeigen ({upcomingAppointmentsCount - 2} weitere)</Text>
+                    <Ionicons name="chevron-down" size={16} color={COLORS.primary} />
+                  </TouchableOpacity>
+                )}
+                {appointmentsExpanded && (
+                  <View>
+                    <TouchableOpacity
+                      style={styles.expandButton}
+                      onPress={() => {
+                        console.log('Collapsing appointments');
+                        setAppointmentsExpanded(false);
+                      }}
+                    >
+                      <Text style={styles.expandButtonText}>Weniger anzeigen</Text>
+                      <Ionicons name="chevron-up" size={16} color={COLORS.primary} />
+                    </TouchableOpacity>
+                    <Link href={{ pathname: "/(app)/appointments" } as any} asChild>
+                      <TouchableOpacity style={[styles.expandButton, { backgroundColor: COLORS.primaryLight, borderRadius: BORDER_RADIUS.sm, marginTop: SPACING.sm, paddingVertical: SPACING.md }]}>
+                        <Text style={[styles.expandButtonText, { fontWeight: "800" }]}>Alle Termine anzeigen</Text>
+                      </TouchableOpacity>
+                    </Link>
+                  </View>
+                )}
+              </View>
+            </View>
+          </>
+        )}
+      </View>
+
+      {/* A1/A2 Consultation (Leads) */}
+      <SectionHeader
+        title="A1/A2 Beratungen (Leads)"
+        action={
+          <Link href={{ pathname: "/(app)/leads" } as any} asChild>
+            <TouchableOpacity style={styles.linkBtn}>
+              <Text style={styles.linkBtnText}>{de.dashboard.viewAll}</Text>
+            </TouchableOpacity>
+          </Link>
+        }
+      />
+      <View style={styles.listCard}>
+        {leadsLoading && <Text style={{ color: COLORS.textSecondary }}>{de.common.loading}</Text>}
+        {!leadsLoading && displayedLeads.length === 0 && (
+          <Text style={{ color: COLORS.textSecondary }}>Keine bevorstehenden Leads.</Text>
+        )}
+        {!leadsLoading && displayedLeads.length > 0 && (
+          <>
+            {displayedLeads.map((lead, i) => (
+              <Pressable
+                key={lead._id}
+                onPress={() => setSelectedLead(lead)}
+                style={[styles.row, i > 0 && styles.rowDivider]}
+              >
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.rowTitle}>{lead.fullName}</Text>
+                  <Text style={styles.rowSub}>{lead.email} · {lead.phoneNumber}</Text>
+                  <Text style={styles.rowSubSmall}>{leadAddress(lead)}</Text>
+                </View>
+                <View style={{ alignItems: "flex-end" }}>
+                  <Text style={styles.when}>{leadDisplayDate(lead)}</Text>
+                  <Text style={styles.slot}>{lead.selectedSlot ?? "—"}</Text>
+                </View>
+              </Pressable>
+            ))}
+            <View style={styles.expandButtonContainer}>
+              {!leadsExpanded && upcoming.length > 2 && (
+                <TouchableOpacity
+                  style={styles.expandButton}
+                  onPress={() => {
+                    console.log('Expanding leads');
+                    setLeadsExpanded(true);
+                  }}
+                >
+                  <Text style={styles.expandButtonText}>Mehr anzeigen ({upcoming.length - 2} weitere)</Text>
+                  <Ionicons name="chevron-down" size={16} color={COLORS.primary} />
+                </TouchableOpacity>
+              )}
+              {leadsExpanded && (
+                <View>
+                  <TouchableOpacity
+                    style={styles.expandButton}
+                    onPress={() => {
+                      console.log('Collapsing leads');
+                      setLeadsExpanded(false);
+                    }}
+                  >
+                    <Text style={styles.expandButtonText}>Weniger anzeigen</Text>
+                    <Ionicons name="chevron-up" size={16} color={COLORS.primary} />
+                  </TouchableOpacity>
+                  <Link href={{ pathname: "/(app)/leads" } as any} asChild>
+                    <TouchableOpacity style={[styles.expandButton, { backgroundColor: COLORS.primaryLight, borderRadius: BORDER_RADIUS.sm, marginTop: SPACING.sm, paddingVertical: SPACING.md }]}>
+                      <Text style={[styles.expandButtonText, { fontWeight: "800" }]}>Alle Leads anzeigen</Text>
+                    </TouchableOpacity>
+                  </Link>
+                </View>
+              )}
+            </View>
+          </>
+        )}
+      </View>
+
+      {/* Active Patients (Latest 5) */}
+      <SectionHeader
+        title={de.patients.title}
+        action={
+          <Link href={{ pathname: "/(app)/patients" } as any} asChild>
+            <TouchableOpacity style={styles.linkBtn}>
+              <Text style={styles.linkBtnText}>{de.dashboard.viewAll}</Text>
+            </TouchableOpacity>
+          </Link>
+        }
+      />
+      <View style={styles.listCard}>
+        {loadingPatients && (
+          <View style={{ paddingVertical: 20, alignItems: "center" }}>
+            <ActivityIndicator size="small" color={COLORS.primary} />
+          </View>
+        )}
+        {!loadingPatients && displayedActivePatients.length === 0 && (
+          <Text style={{ color: COLORS.textSecondary, paddingVertical: 12 }}>{de.patients.noPatients}</Text>
+        )}
+        {!loadingPatients && displayedActivePatients.length > 0 && (
+          <>
+            {displayedActivePatients.map((patient, i) => (
+              <TouchableOpacity
+                key={patient._id}
+                style={[styles.row, i > 0 && styles.rowDivider]}
+              >
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.rowTitle}>{patient.fullName}</Text>
+                  <Text style={styles.rowSub}>{patient.email}</Text>
+                  <Text style={styles.rowSubSmall}>{patient.phoneNumber}</Text>
+                </View>
+                <View style={{ alignItems: "flex-end" }}>
+                  <View style={styles.badge}>
+                    <Text style={styles.badgeText}>{de.patients.status.schwanger}</Text>
+                  </View>
+                </View>
+              </TouchableOpacity>
+            ))}
+            <View style={styles.expandButtonContainer}>
+              {!patientsExpanded && activePatientsCount > 2 && (
+                <TouchableOpacity
+                  style={styles.expandButton}
+                  onPress={() => {
+                    console.log('Expanding patients');
+                    setPatientsExpanded(true);
+                  }}
+                >
+                  <Text style={styles.expandButtonText}>Mehr anzeigen ({activePatientsCount - 2} weitere)</Text>
+                  <Ionicons name="chevron-down" size={16} color={COLORS.primary} />
+                </TouchableOpacity>
+              )}
+              {patientsExpanded && (
+                <View>
+                  <TouchableOpacity
+                    style={styles.expandButton}
+                    onPress={() => {
+                      console.log('Collapsing patients');
+                      setPatientsExpanded(false);
+                    }}
+                  >
+                    <Text style={styles.expandButtonText}>Weniger anzeigen</Text>
+                    <Ionicons name="chevron-up" size={16} color={COLORS.primary} />
+                  </TouchableOpacity>
+                  <Link href={{ pathname: "/(app)/patients" } as any} asChild>
+                    <TouchableOpacity style={[styles.expandButton, { backgroundColor: COLORS.primaryLight, borderRadius: BORDER_RADIUS.sm, marginTop: SPACING.sm, paddingVertical: SPACING.md }]}>
+                      <Text style={[styles.expandButtonText, { fontWeight: "800" }]}>Alle Patienten anzeigen</Text>
+                    </TouchableOpacity>
+                  </Link>
+                </View>
+              )}
+            </View>
+          </>
+        )}
       </View>
 
       {/* Lead details modal */}
@@ -801,6 +985,27 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     fontSize: 12,
     textAlign: "center",
+  },
+
+  // Expand Button
+  expandButtonContainer: {
+    paddingTop: SPACING.md,
+    paddingBottom: SPACING.xs,
+    alignItems: "center",
+  },
+  expandButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: SPACING.xs,
+    paddingVertical: SPACING.sm,
+    paddingHorizontal: SPACING.md,
+  },
+  expandButtonText: {
+    color: COLORS.primary,
+    fontWeight: "700",
+    fontSize: 13,
+    flexShrink: 0,
   },
 
   // Modal
