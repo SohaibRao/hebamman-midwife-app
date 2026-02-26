@@ -22,6 +22,8 @@ const SERVICE_TYPE_MAP: Record<string, string> = {
   D1: "D1",
   D2: "D2",
   F1: "F1",
+  G: "Telefonberatung",
+  PS: "Privatleistung",
 };
 
 // Map service codes to location types
@@ -35,6 +37,8 @@ const SERVICE_LOCATION_MAP: Record<string, string> = {
   D1: "In persona",
   D2: "In Video",
   F1: "In persona",
+  G: "Telefon",
+  PS: "Privatleistung",
 };
 
 const getLocationBadge = (serviceCode: string) => {
@@ -45,7 +49,17 @@ const getLocationBadge = (serviceCode: string) => {
   let textColor: string;
   let icon: keyof typeof Ionicons.glyphMap;
 
-  if (locationLabel.includes("In persona") && locationLabel.includes("In Video")) {
+  if (locationLabel === "Telefon") {
+    // G slot - Phone consultation (use yellow/orange)
+    backgroundColor = COLORS.locationTelefon;
+    textColor = COLORS.locationTelefonText;
+    icon = "call";
+  } else if (locationLabel === "Privatleistung") {
+    // PS - Private service (use purple)
+    backgroundColor = COLORS.locationVideocall;
+    textColor = COLORS.locationVideocallText;
+    icon = "briefcase";
+  } else if (locationLabel.includes("In persona") && locationLabel.includes("In Video")) {
     // A1/A2 - Both options (use purple for hybrid)
     backgroundColor = COLORS.locationVideocall;
     textColor = COLORS.locationVideocallText;

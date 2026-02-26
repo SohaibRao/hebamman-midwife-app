@@ -3,6 +3,7 @@ import { Link, useRouter } from "expo-router";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
+  Linking,
   Modal,
   Pressable,
   ScrollView,
@@ -16,6 +17,8 @@ import { Ionicons } from "@expo/vector-icons";
 // ---- Leads hook & helpers ----
 import { Lead, leadAddress, leadDisplayDate, useLeads } from "@/hooks/useLeads";
 import { useMidwifeProfile } from "@/hooks/useMidwifeProfile";
+import { PhoneBooking, usePhoneBookings, phoneBookingDisplayDate, phoneBookingTimeRange } from "@/hooks/usePhoneBookings";
+import { PrivateServiceBooking, usePrivateServiceBookings, privateServiceDisplayDate, privateServiceTimeRange, privateServiceFullName } from "@/hooks/usePrivateServiceBookings";
 import { api } from "@/lib/api";
 import { COLORS, SPACING, BORDER_RADIUS, SHADOWS } from "@/constants/theme";
 import de from "@/constants/i18n";
@@ -32,6 +35,7 @@ const SERVICE_COLORS: Record<string, string> = {
   D1: COLORS.serviceD1,
   D2: COLORS.serviceD2,
   F1: COLORS.serviceF1,
+  G: COLORS.serviceG,
 };
 
 const SERVICE_NAMES: Record<string, string> = {
@@ -44,6 +48,7 @@ const SERVICE_NAMES: Record<string, string> = {
   D1: de.serviceCodes.D1,
   D2: de.serviceCodes.D2,
   F1: de.serviceCodes.F1,
+  G: de.serviceCodes.G,
 };
 
 const codeColor = (code: string) => SERVICE_COLORS[code] ?? COLORS.textSecondary;
@@ -179,6 +184,16 @@ export default function Dashboard() {
   const { upcoming, loading: leadsLoading } = useLeads(midwifeId);
   const [selectedLead, setSelectedLead] = React.useState<Lead | null>(null);
 
+  // Fetch phone bookings (G slots)
+  const { upcoming: upcomingPhoneBookings, loading: phoneBookingsLoading } = usePhoneBookings(midwifeId);
+  const [phoneBookingsExpanded, setPhoneBookingsExpanded] = useState(false);
+  const [selectedPhoneBooking, setSelectedPhoneBooking] = useState<PhoneBooking | null>(null);
+
+  // Fetch private service bookings
+  const { upcoming: upcomingPrivateBookings, loading: privateBookingsLoading } = usePrivateServiceBookings(midwifeId);
+  const [privateBookingsExpanded, setPrivateBookingsExpanded] = useState(false);
+  const [selectedPrivateBooking, setSelectedPrivateBooking] = useState<PrivateServiceBooking | null>(null);
+
   // Expandable sections state
   const [appointmentsExpanded, setAppointmentsExpanded] = useState(false);
   const [leadsExpanded, setLeadsExpanded] = useState(false);
@@ -194,9 +209,9 @@ export default function Dashboard() {
     setLoadingPatients(true);
     try {
       const res = await api(`/api/public/midwifeBooking/${midwifeId}`);
-      const json = await res.json();
+      const json = await readJsonSafe<{ success?: boolean; data?: Patient[] }>(res);
 
-      if (json.success) {
+      if (json?.success) {
         setPatients(json.data || []);
       }
     } catch (e: any) {
@@ -216,9 +231,9 @@ export default function Dashboard() {
     setLoadingRequests(true);
     try {
       const res = await api(`/api/public/clientRequest?midwifeId=${midwifeId}`);
-      const json = await res.json();
+      const json = await readJsonSafe<{ success?: boolean; data?: any[] }>(res);
 
-      if (json.success && json.data) {
+      if (json?.success && json.data) {
         const pendingCount = json.data.filter((r: any) => r.status === "pending").length;
         setOpenRequestsCount(pendingCount);
       }
@@ -356,6 +371,16 @@ export default function Dashboard() {
     return result;
   }, [appointments, appointmentsExpanded]);
 
+  // Get upcoming phone bookings to display (expandable)
+  const displayedPhoneBookings = useMemo(() => {
+    return phoneBookingsExpanded ? upcomingPhoneBookings.slice(0, 5) : upcomingPhoneBookings.slice(0, 2);
+  }, [upcomingPhoneBookings, phoneBookingsExpanded]);
+
+  // Get upcoming private service bookings to display (expandable)
+  const displayedPrivateBookings = useMemo(() => {
+    return privateBookingsExpanded ? upcomingPrivateBookings.slice(0, 5) : upcomingPrivateBookings.slice(0, 2);
+  }, [upcomingPrivateBookings, privateBookingsExpanded]);
+
   // Get upcoming leads to display (expandable)
   const displayedLeads = useMemo(() => {
     const result = leadsExpanded ? upcoming.slice(0, 5) : upcoming.slice(0, 2);
@@ -458,13 +483,15 @@ export default function Dashboard() {
 
         <TouchableOpacity
           style={[styles.statCard, { backgroundColor: COLORS.primaryLight }]}
-          onPress={() => {
-            // Will be implemented later when API is available
-          }}
+          onPress={() => router.push("/(app)/phone-bookings" as any)}
         >
-          <Text style={styles.statIcon}>👶</Text>
-          <Text style={styles.statValue}>0</Text>
-          <Text style={styles.statLabel}>{de.dashboard.stats.birthsThisMonth}</Text>
+          <Ionicons name="call-outline" size={32} color={COLORS.serviceG} />
+          {phoneBookingsLoading ? (
+            <ActivityIndicator size="small" color={COLORS.primary} style={{ marginTop: 8 }} />
+          ) : (
+            <Text style={styles.statValue}>{upcomingPhoneBookings.length}</Text>
+          )}
+          <Text style={styles.statLabel}>{de.phoneBookings.title}</Text>
         </TouchableOpacity>
 
         <TouchableOpacity
@@ -478,6 +505,19 @@ export default function Dashboard() {
             <Text style={styles.statValue}>{upcomingAppointmentsCount}</Text>
           )}
           <Text style={styles.statLabel}>{de.dashboard.stats.appointmentsToday}</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[styles.statCard, { backgroundColor: COLORS.primaryLight }]}
+          onPress={() => router.push("/(app)/private-services" as any)}
+        >
+          <Ionicons name="briefcase-outline" size={32} color={COLORS.servicePrivate} />
+          {privateBookingsLoading ? (
+            <ActivityIndicator size="small" color={COLORS.primary} style={{ marginTop: 8 }} />
+          ) : (
+            <Text style={styles.statValue}>{upcomingPrivateBookings.length}</Text>
+          )}
+          <Text style={styles.statLabel}>{de.privateServices.title}</Text>
         </TouchableOpacity>
       </View>
 
@@ -581,6 +621,162 @@ export default function Dashboard() {
                   </View>
                 )}
               </View>
+            </View>
+          </>
+        )}
+      </View>
+
+      {/* Telefon-Termine (Phone Bookings / G Slots) */}
+      <SectionHeader
+        title={de.phoneBookings.title}
+        action={
+          <Link href={{ pathname: "/(app)/phone-bookings" } as any} asChild>
+            <TouchableOpacity style={styles.linkBtn}>
+              <Text style={styles.linkBtnText}>{de.phoneBookings.viewAll}</Text>
+            </TouchableOpacity>
+          </Link>
+        }
+      />
+      <View style={styles.listCard}>
+        {phoneBookingsLoading && (
+          <View style={{ paddingVertical: 20, alignItems: "center" }}>
+            <ActivityIndicator size="small" color={COLORS.primary} />
+          </View>
+        )}
+        {!phoneBookingsLoading && displayedPhoneBookings.length === 0 && (
+          <Text style={{ color: COLORS.textSecondary, paddingVertical: 12 }}>{de.phoneBookings.noUpcoming}</Text>
+        )}
+        {!phoneBookingsLoading && displayedPhoneBookings.length > 0 && (
+          <>
+            {displayedPhoneBookings.map((booking, i) => {
+              const time = phoneBookingTimeRange(booking);
+              return (
+                <Pressable
+                  key={booking._id}
+                  onPress={() => setSelectedPhoneBooking(booking)}
+                  style={[styles.row, i > 0 && styles.rowDivider]}
+                >
+                  <View style={styles.phoneBookingIcon}>
+                    <Ionicons name="call" size={18} color={COLORS.serviceG} />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.rowTitle}>{booking.fullName}</Text>
+                    <Text style={styles.rowSub}>{booking.email}{booking.phone ? ` · ${booking.phone}` : ''}</Text>
+                  </View>
+                  <View style={{ alignItems: "flex-end" }}>
+                    <Text style={[styles.when, { color: COLORS.serviceG }]}>{phoneBookingDisplayDate(booking)}</Text>
+                    <Text style={styles.slot}>{time.start} – {time.end}</Text>
+                  </View>
+                </Pressable>
+              );
+            })}
+            <View style={styles.expandButtonContainer}>
+              {!phoneBookingsExpanded && upcomingPhoneBookings.length > 2 && (
+                <TouchableOpacity
+                  style={styles.expandButton}
+                  onPress={() => setPhoneBookingsExpanded(true)}
+                >
+                  <Text style={styles.expandButtonText}>Mehr anzeigen ({upcomingPhoneBookings.length - 2} weitere)</Text>
+                  <Ionicons name="chevron-down" size={16} color={COLORS.primary} />
+                </TouchableOpacity>
+              )}
+              {phoneBookingsExpanded && (
+                <View>
+                  <TouchableOpacity
+                    style={styles.expandButton}
+                    onPress={() => setPhoneBookingsExpanded(false)}
+                  >
+                    <Text style={styles.expandButtonText}>Weniger anzeigen</Text>
+                    <Ionicons name="chevron-up" size={16} color={COLORS.primary} />
+                  </TouchableOpacity>
+                  <Link href={{ pathname: "/(app)/phone-bookings" } as any} asChild>
+                    <TouchableOpacity style={[styles.expandButton, { backgroundColor: COLORS.primaryLight, borderRadius: BORDER_RADIUS.sm, marginTop: SPACING.sm, paddingVertical: SPACING.md }]}>
+                      <Text style={[styles.expandButtonText, { fontWeight: "800" }]}>Alle Telefon-Termine anzeigen</Text>
+                    </TouchableOpacity>
+                  </Link>
+                </View>
+              )}
+            </View>
+          </>
+        )}
+      </View>
+
+      {/* Privatleistungen (Private Service Bookings) */}
+      <SectionHeader
+        title={de.privateServices.title}
+        action={
+          <Link href={{ pathname: "/(app)/private-services" } as any} asChild>
+            <TouchableOpacity style={styles.linkBtn}>
+              <Text style={styles.linkBtnText}>{de.privateServices.viewAll}</Text>
+            </TouchableOpacity>
+          </Link>
+        }
+      />
+      <View style={styles.listCard}>
+        {privateBookingsLoading && (
+          <View style={{ paddingVertical: 20, alignItems: "center" }}>
+            <ActivityIndicator size="small" color={COLORS.primary} />
+          </View>
+        )}
+        {!privateBookingsLoading && displayedPrivateBookings.length === 0 && (
+          <Text style={{ color: COLORS.textSecondary, paddingVertical: 12 }}>{de.privateServices.noUpcoming}</Text>
+        )}
+        {!privateBookingsLoading && displayedPrivateBookings.length > 0 && (
+          <>
+            {displayedPrivateBookings.map((booking, i) => {
+              const time = privateServiceTimeRange(booking);
+              const fullName = privateServiceFullName(booking);
+              const isCourse = booking.bookingType === "course";
+              return (
+                <Pressable
+                  key={booking._id}
+                  onPress={() => setSelectedPrivateBooking(booking)}
+                  style={[styles.row, i > 0 && styles.rowDivider]}
+                >
+                  <View style={styles.privateBookingIcon}>
+                    <Ionicons name="briefcase" size={18} color={COLORS.servicePrivate} />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.rowTitle}>{booking.serviceName}</Text>
+                    <Text style={styles.rowSub}>{fullName}{booking.email ? ` \u00B7 ${booking.email}` : ''}</Text>
+                  </View>
+                  <View style={{ alignItems: "flex-end" }}>
+                    <Text style={[styles.when, { color: COLORS.servicePrivate }]}>{privateServiceDisplayDate(booking)}</Text>
+                    {isCourse ? (
+                      <Text style={styles.slot}>{booking.courseSessions?.length || 0}x {de.privateServices.sessions}</Text>
+                    ) : (
+                      <Text style={styles.slot}>{time.start} \u2013 {time.end}</Text>
+                    )}
+                  </View>
+                </Pressable>
+              );
+            })}
+            <View style={styles.expandButtonContainer}>
+              {!privateBookingsExpanded && upcomingPrivateBookings.length > 2 && (
+                <TouchableOpacity
+                  style={styles.expandButton}
+                  onPress={() => setPrivateBookingsExpanded(true)}
+                >
+                  <Text style={styles.expandButtonText}>Mehr anzeigen ({upcomingPrivateBookings.length - 2} weitere)</Text>
+                  <Ionicons name="chevron-down" size={16} color={COLORS.primary} />
+                </TouchableOpacity>
+              )}
+              {privateBookingsExpanded && (
+                <View>
+                  <TouchableOpacity
+                    style={styles.expandButton}
+                    onPress={() => setPrivateBookingsExpanded(false)}
+                  >
+                    <Text style={styles.expandButtonText}>Weniger anzeigen</Text>
+                    <Ionicons name="chevron-up" size={16} color={COLORS.primary} />
+                  </TouchableOpacity>
+                  <Link href={{ pathname: "/(app)/private-services" } as any} asChild>
+                    <TouchableOpacity style={[styles.expandButton, { backgroundColor: COLORS.primaryLight, borderRadius: BORDER_RADIUS.sm, marginTop: SPACING.sm, paddingVertical: SPACING.md }]}>
+                      <Text style={[styles.expandButtonText, { fontWeight: "800" }]}>Alle Privatleistungen anzeigen</Text>
+                    </TouchableOpacity>
+                  </Link>
+                </View>
+              )}
             </View>
           </>
         )}
@@ -753,6 +949,108 @@ export default function Dashboard() {
               <Detail label="Versicherung" value={`${selectedLead.insuranceType ?? "—"} (${selectedLead.insuranceCompany ?? "—"})`} />
               <Detail label={de.common.address} value={leadAddress(selectedLead)} />
               <Detail label={de.common.status} value={selectedLead.status ?? "pending"} />
+            </Pressable>
+          </Pressable>
+        </Modal>
+      )}
+      {/* Private service booking details modal */}
+      {selectedPrivateBooking && (
+        <Modal visible transparent animationType="fade" onRequestClose={() => setSelectedPrivateBooking(null)}>
+          <Pressable style={styles.overlay} onPress={() => setSelectedPrivateBooking(null)}>
+            <Pressable style={styles.modalCard}>
+              <ScrollView showsVerticalScrollIndicator={false}>
+                <View style={styles.modalHeader}>
+                  <Text style={styles.modalTitle}>{de.privateServices.details}</Text>
+                  <TouchableOpacity onPress={() => setSelectedPrivateBooking(null)}>
+                    <Ionicons name="close" size={24} color={COLORS.textSecondary} />
+                  </TouchableOpacity>
+                </View>
+                <View style={styles.privateBookingModalBadge}>
+                  <Ionicons name="briefcase" size={16} color={COLORS.servicePrivate} />
+                  <Text style={{ color: COLORS.servicePrivate, fontWeight: "700", fontSize: 14 }}>
+                    {selectedPrivateBooking.bookingType === "course" ? de.privateServices.bookingTypeCourse : de.privateServices.bookingTypeSingle}
+                  </Text>
+                </View>
+                <Detail label={de.privateServices.serviceName} value={selectedPrivateBooking.serviceName} />
+                <Detail label={de.common.name} value={privateServiceFullName(selectedPrivateBooking)} />
+                <Detail label={de.common.email} value={selectedPrivateBooking.email} />
+                {selectedPrivateBooking.phone && (
+                  <Detail label={de.common.phone} value={selectedPrivateBooking.phone} />
+                )}
+                <Detail
+                  label={de.privateServices.serviceType}
+                  value={selectedPrivateBooking.serviceType === "In persona" ? de.privateServices.typeInPersona : de.privateServices.typeVideocall}
+                />
+                <Detail
+                  label={de.privateServices.serviceMode}
+                  value={selectedPrivateBooking.serviceMode === "Individual" ? de.privateServices.modeIndividual : de.privateServices.modeGroup}
+                />
+                <Detail label={de.privateServices.duration} value={`${selectedPrivateBooking.duration} ${de.privateServices.minutes}`} />
+                <Detail label={de.privateServices.price} value={`${(parseFloat(String(selectedPrivateBooking.price ?? '')) || 0).toFixed(2)} \u20AC`} />
+                {selectedPrivateBooking.bookingType === "single" && (
+                  <>
+                    <Detail label={de.common.date} value={privateServiceDisplayDate(selectedPrivateBooking)} />
+                    <Detail label={de.privateServices.timeSlot} value={selectedPrivateBooking.selectedSlot?.replace("-", " \u2013 ") || "\u2014"} />
+                  </>
+                )}
+                {selectedPrivateBooking.bookingType === "course" && selectedPrivateBooking.courseSessions && selectedPrivateBooking.courseSessions.length > 0 && (
+                  <View style={{ marginTop: SPACING.lg, borderTopWidth: 1, borderTopColor: COLORS.border, paddingTop: SPACING.md }}>
+                    <Text style={{ fontSize: 15, fontWeight: "700", color: COLORS.text, marginBottom: SPACING.sm }}>
+                      {de.privateServices.sessions} ({selectedPrivateBooking.courseSessions.length})
+                    </Text>
+                    {selectedPrivateBooking.courseSessions.map((session, idx) => (
+                      <View key={idx} style={{ flexDirection: "row", alignItems: "center", paddingVertical: SPACING.xs, gap: SPACING.sm }}>
+                        <View style={{ width: 24, height: 24, borderRadius: 12, backgroundColor: "#f5f3ff", alignItems: "center", justifyContent: "center" }}>
+                          <Text style={{ fontSize: 12, fontWeight: "700", color: COLORS.servicePrivate }}>{session.sessionNumber}</Text>
+                        </View>
+                        <Text style={{ flex: 1, color: COLORS.text, fontSize: 13 }}>{session.day}, {session.date}</Text>
+                        <Text style={{ color: COLORS.textSecondary, fontSize: 12 }}>{session.startTime} {"\u2013"} {session.endTime}</Text>
+                      </View>
+                    ))}
+                  </View>
+                )}
+                <Detail label={de.common.status} value={selectedPrivateBooking.status} />
+              </ScrollView>
+            </Pressable>
+          </Pressable>
+        </Modal>
+      )}
+      {/* Phone booking details modal */}
+      {selectedPhoneBooking && (
+        <Modal visible transparent animationType="fade" onRequestClose={() => setSelectedPhoneBooking(null)}>
+          <Pressable style={styles.overlay} onPress={() => setSelectedPhoneBooking(null)}>
+            <Pressable style={styles.modalCard}>
+              <View style={styles.modalHeader}>
+                <Text style={styles.modalTitle}>{de.phoneBookings.details}</Text>
+                <TouchableOpacity onPress={() => setSelectedPhoneBooking(null)}>
+                  <Ionicons name="close" size={24} color={COLORS.textSecondary} />
+                </TouchableOpacity>
+              </View>
+              <View style={styles.phoneBookingModalBadge}>
+                <Ionicons name="call" size={16} color={COLORS.serviceG} />
+                <Text style={{ color: COLORS.serviceG, fontWeight: "700", fontSize: 14 }}>{de.phoneBookings.phoneConsultation}</Text>
+              </View>
+              <Detail label={de.common.name} value={selectedPhoneBooking.fullName} />
+              <Detail label={de.common.email} value={selectedPhoneBooking.email} />
+              {selectedPhoneBooking.phone && (
+                <Detail label={de.common.phone} value={selectedPhoneBooking.phone} />
+              )}
+              <Detail label={de.common.date} value={phoneBookingDisplayDate(selectedPhoneBooking)} />
+              <Detail label={de.phoneBookings.timeSlot} value={selectedPhoneBooking.selectedSlot.replace("-", " – ")} />
+              {selectedPhoneBooking.meetingLink && (
+                <TouchableOpacity
+                  style={{ flexDirection: "row", marginTop: SPACING.sm, alignItems: "center" }}
+                  onPress={() => Linking.openURL(selectedPhoneBooking.meetingLink!)}
+                >
+                  <Text style={{ width: 110, color: COLORS.textSecondary, fontWeight: "700" }}>Google Meet:</Text>
+                  <Ionicons name="videocam" size={16} color={COLORS.serviceG} style={{ marginRight: 4 }} />
+                  <Text style={{ flex: 1, color: COLORS.serviceG }} numberOfLines={1}>
+                    {selectedPhoneBooking.meetingLink}
+                  </Text>
+                  <Ionicons name="open-outline" size={16} color={COLORS.serviceG} />
+                </TouchableOpacity>
+              )}
+              <Detail label={de.common.status} value={selectedPhoneBooking.status} />
             </Pressable>
           </Pressable>
         </Modal>
@@ -1034,5 +1332,49 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: "800",
     color: COLORS.text,
+  },
+
+  // Private Service Booking
+  privateBookingIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: BORDER_RADIUS.sm,
+    backgroundColor: "#f5f3ff",
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: SPACING.sm,
+  },
+  privateBookingModalBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    alignSelf: "flex-start",
+    gap: 6,
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.sm,
+    borderRadius: BORDER_RADIUS.full,
+    backgroundColor: "#f5f3ff",
+    marginBottom: SPACING.md,
+  },
+
+  // Phone Booking
+  phoneBookingIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: BORDER_RADIUS.sm,
+    backgroundColor: "#f0fdfa",
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: SPACING.sm,
+  },
+  phoneBookingModalBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    alignSelf: "flex-start",
+    gap: 6,
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.sm,
+    borderRadius: BORDER_RADIUS.full,
+    backgroundColor: "#f0fdfa",
+    marginBottom: SPACING.md,
   },
 });

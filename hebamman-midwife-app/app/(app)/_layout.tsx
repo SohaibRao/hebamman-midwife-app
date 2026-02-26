@@ -45,6 +45,8 @@ function MenuButton() {
               <MenuItem icon="home-outline" label={de.nav.overview} onPress={() => navigateTo("/dashboard")} />
               <MenuItem icon="people-outline" label="Leads" onPress={() => navigateTo("/(app)/leads")} />
               <MenuItem icon="calendar-outline" label={de.nav.appointments} onPress={() => navigateTo("/(app)/appointments")} />
+              <MenuItem icon="call-outline" label={de.phoneBookings.title} onPress={() => navigateTo("/(app)/phone-bookings")} />
+              <MenuItem icon="briefcase-outline" label={de.privateServices.title} onPress={() => navigateTo("/(app)/private-services")} />
               <MenuItem icon="document-text-outline" label={de.nav.requests} onPress={() => navigateTo("/(app)/requests")} />
               <MenuItem icon="people-outline" label={de.nav.patients} onPress={() => navigateTo("/(app)/patients")} />
               <MenuItem icon="person-outline" label={de.nav.profile} onPress={() => navigateTo("/(app)/profile")} />
@@ -120,6 +122,14 @@ export default function AppLayout() {
       <Stack.Screen
         name="requests/index"
         options={{ title: de.requests.title }}
+      />
+      <Stack.Screen
+        name="phone-bookings/index"
+        options={{ title: de.phoneBookings.title }}
+      />
+      <Stack.Screen
+        name="private-services/index"
+        options={{ title: de.privateServices.title }}
       />
     </Stack>
   );

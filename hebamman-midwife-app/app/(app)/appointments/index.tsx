@@ -23,6 +23,8 @@ import EditAppointmentModal from "@/components/appointments/EditAppointmentModal
 import ReactivateAppointmentModal from "@/components/appointments/ReactivateAppointmentModal";
 import CalendarView from "@/components/appointments/CalendarView";
 import BulkCancelAppointments from "@/components/appointments/BulkCancelAppointments";
+import { usePhoneBookings } from "@/hooks/usePhoneBookings";
+import { usePrivateServiceBookings } from "@/hooks/usePrivateServiceBookings";
 import { COLORS, SPACING, BORDER_RADIUS, SHADOWS } from "@/constants/theme";
 import de from "@/constants/i18n";
 
@@ -194,6 +196,10 @@ export default function AppointmentsScreen() {
   const timetable: Timetable | undefined = midwifeProfile?.identity?.timetable;
   const clientET = useMemo(() => new Date(), []);
 
+  // Fetch phone bookings (G slots) and private service bookings (PS)
+  const { bookings: phoneBookings, loading: phoneLoading } = usePhoneBookings(midwifeId || undefined);
+  const { bookings: privateBookings, loading: privateLoading } = usePrivateServiceBookings(midwifeId || undefined);
+
   // Core State
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -288,7 +294,32 @@ export default function AppointmentsScreen() {
     }
   }, [profileStatus, midwifeId, fetchMonthly]);
 
-  // Flatten appointments
+  // Supplement user details with names from phone/private bookings
+  useEffect(() => {
+    const extra: Record<string, UserDetail> = {};
+
+    phoneBookings.forEach((b) => {
+      if (b.userId) {
+        extra[b.userId] = { name: b.fullName, email: b.email, role: "client" };
+      }
+    });
+
+    privateBookings.forEach((b) => {
+      if (b.userId) {
+        extra[b.userId] = {
+          name: `${b.firstName || ""} ${b.lastName || ""}`.trim() || "\u2014",
+          email: b.email,
+          role: "client",
+        };
+      }
+    });
+
+    if (Object.keys(extra).length > 0) {
+      setUserDetails((prev) => ({ ...prev, ...extra }));
+    }
+  }, [phoneBookings, privateBookings]);
+
+  // Flatten appointments (including G slots and private service bookings)
   const allAppointments: UiApt[] = useMemo(() => {
     const out: UiApt[] = [];
     Object.values(monthly).forEach((bucket) => {
@@ -307,12 +338,73 @@ export default function AppointmentsScreen() {
       add(bucket.D2, "D2");
       add(bucket.F1, "F1");
     });
+
+    // Add G slot (phone) bookings
+    phoneBookings.forEach((b) => {
+      const [start, end] = (b.selectedSlot || "").split("-");
+      const d = toDate(b.date);
+      if (!isNaN(d.getTime())) {
+        out.push({
+          midwifeId: b.midwifeId,
+          clientId: b.userId,
+          appointmentId: b._id,
+          appointmentDate: b.date,
+          startTime: start || "",
+          endTime: end || "",
+          duration: 25,
+          status: b.status,
+          serviceCode: "G",
+          dateObj: d,
+        });
+      }
+    });
+
+    // Add private service bookings
+    privateBookings.forEach((b) => {
+      if (b.bookingType === "course" && b.courseSessions?.length) {
+        b.courseSessions.forEach((session) => {
+          const d = toDate(session.date);
+          if (!isNaN(d.getTime())) {
+            out.push({
+              midwifeId: b.midwifeId,
+              clientId: b.userId,
+              appointmentId: `${b._id}-${session.sessionNumber}`,
+              appointmentDate: session.date,
+              startTime: session.startTime || "",
+              endTime: session.endTime || "",
+              duration: b.duration,
+              status: b.status,
+              serviceCode: "PS",
+              dateObj: d,
+            });
+          }
+        });
+      } else {
+        const [start, end] = (b.selectedSlot || "").split("-");
+        const d = toDate(b.selectedDate);
+        if (!isNaN(d.getTime())) {
+          out.push({
+            midwifeId: b.midwifeId,
+            clientId: b.userId,
+            appointmentId: b._id,
+            appointmentDate: b.selectedDate,
+            startTime: start || "",
+            endTime: end || "",
+            duration: b.duration,
+            status: b.status,
+            serviceCode: "PS",
+            dateObj: d,
+          });
+        }
+      }
+    });
+
     out.sort((a, b) => {
       const d = a.dateObj.getTime() - b.dateObj.getTime();
       return d !== 0 ? d : a.startTime.localeCompare(b.startTime);
     });
     return out;
-  }, [monthly]);
+  }, [monthly, phoneBookings, privateBookings]);
 
   // Filter appointments by time (upcoming/past/all)
   const timeFilteredAppointments = useMemo(() => {
@@ -1018,7 +1110,7 @@ export default function AppointmentsScreen() {
         </View>
       )}
 
-      {loading ? (
+      {loading || phoneLoading || privateLoading ? (
         <View style={[styles.center, { padding: 20 }]}>
           <ActivityIndicator />
         </View>

@@ -77,6 +77,8 @@ export const COLORS = {
   serviceD1: '#ef4444',      // Red
   serviceD2: '#f97316',      // Orange
   serviceF1: '#a855f7',      // Violet
+  serviceG: '#14b8a6',       // Teal - Phone consultations (Telefon-Termine)
+  servicePrivate: '#8B5CF6', // Violet - Private service bookings (Privatleistungen)
 };
 
 export const TYPOGRAPHY = {

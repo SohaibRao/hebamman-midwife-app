@@ -46,6 +46,7 @@ export default function AppointmentDetailsModal({
   if (!appointment) return null;
 
   const isCancelled = appointment.status?.toLowerCase() === "cancelled";
+  const isReadOnly = appointment.serviceCode === "G" || appointment.serviceCode === "PS";
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
@@ -68,7 +69,13 @@ export default function AppointmentDetailsModal({
           <DetailRow label={de.appointments.duration} value={`${appointment.duration} ${de.appointments.minutes}`} />
           <DetailRow label={de.common.status} value={appointment.status ?? "—"} />
 
-          {isCancelled ? (
+          {isReadOnly ? (
+            <View style={styles.buttonRow}>
+              <TouchableOpacity onPress={onClose} style={styles.secondaryButton}>
+                <Text style={styles.secondaryButtonText}>{de.actions.close}</Text>
+              </TouchableOpacity>
+            </View>
+          ) : isCancelled ? (
             <View style={styles.buttonRow}>
               <TouchableOpacity
                 onPress={() => {
