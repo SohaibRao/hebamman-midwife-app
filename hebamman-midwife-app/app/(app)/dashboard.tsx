@@ -203,6 +203,10 @@ export default function Dashboard() {
   const [patients, setPatients] = useState<Patient[]>([]);
   const [loadingPatients, setLoadingPatients] = useState(false);
 
+  // Active clients count (date-based, from backend)
+  const [activeClientsCount, setActiveClientsCount] = useState<number>(0);
+  const [loadingActiveClients, setLoadingActiveClients] = useState(false);
+
   const fetchPatients = useCallback(async () => {
     if (!midwifeId) return;
 
@@ -244,14 +248,34 @@ export default function Dashboard() {
     }
   }, [midwifeId]);
 
+  // Fetch active clients count (date-based: clients with future non-cancelled appointments)
+  const fetchActiveClientsCount = useCallback(async () => {
+    if (!midwifeId) return;
+
+    setLoadingActiveClients(true);
+    try {
+      const res = await api(`/api/midwives/active-clients`);
+      const json = await readJsonSafe<{ success?: boolean; data?: Record<string, number> }>(res);
+
+      if (json?.success && json.data) {
+        setActiveClientsCount(json.data[midwifeId] ?? 0);
+      }
+    } catch (e: any) {
+      console.error("Error fetching active clients count:", e);
+    } finally {
+      setLoadingActiveClients(false);
+    }
+  }, [midwifeId]);
+
   useEffect(() => {
     if (midwifeId) {
       fetchPatients();
       fetchOpenRequests();
+      fetchActiveClientsCount();
     }
-  }, [midwifeId, fetchPatients, fetchOpenRequests]);
+  }, [midwifeId, fetchPatients, fetchOpenRequests, fetchActiveClientsCount]);
 
-  // Active patients count (converted status)
+  // Converted patients count (for expandable list UI)
   const activePatientsCount = useMemo(() => {
     return patients.filter(p => p.clientStatus === "converted").length;
   }, [patients]);
@@ -260,11 +284,6 @@ export default function Dashboard() {
   const displayedActivePatients = useMemo(() => {
     const activePatients = patients.filter(p => p.clientStatus === "converted");
     const result = patientsExpanded ? activePatients.slice(0, 5) : activePatients.slice(0, 2);
-    console.log('displayedActivePatients recalculated:', {
-      totalActive: activePatients.length,
-      expanded: patientsExpanded,
-      displayedCount: result.length
-    });
     return result;
   }, [patients, patientsExpanded]);
 
@@ -460,10 +479,10 @@ export default function Dashboard() {
           onPress={() => router.push("/(app)/patients" as any)}
         >
           <Text style={styles.statIcon}>👥</Text>
-          {loadingPatients ? (
+          {loadingActiveClients ? (
             <ActivityIndicator size="small" color={COLORS.primary} style={{ marginTop: 8 }} />
           ) : (
-            <Text style={styles.statValue}>{activePatientsCount}</Text>
+            <Text style={styles.statValue}>{activeClientsCount}</Text>
           )}
           <Text style={styles.statLabel}>{de.dashboard.stats.activePatients}</Text>
         </TouchableOpacity>
