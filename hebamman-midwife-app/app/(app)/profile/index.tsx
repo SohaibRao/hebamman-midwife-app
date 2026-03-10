@@ -1,5 +1,5 @@
 // app/(app)/profile/index.tsx
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   View,
   Text,
@@ -11,6 +11,7 @@ import {
   FlatList,
   ActivityIndicator,
   Alert,
+  AppState,
 } from "react-native";
 import { Image } from "expo-image";
 import * as WebBrowser from "expo-web-browser";
@@ -23,21 +24,45 @@ import { api } from "@/lib/api";
 import { Ionicons } from "@expo/vector-icons";
 
 export default function ProfileScreen() {
-  const { user } = useAuth();
-  const userId = user?.id ?? process.env.EXPO_PUBLIC_MIDWIFE_ID ?? null;
+  const { user, getEffectiveUserId } = useAuth();
+  const userId = getEffectiveUserId() ?? process.env.EXPO_PUBLIC_MIDWIFE_ID ?? null;
 
   // --- Google Calendar state ---
   const [gcalConnected, setGcalConnected] = useState(false);
   const [gcalLoading, setGcalLoading] = useState(true);
   const [gcalSyncing, setGcalSyncing] = useState(false);
   const [gcalDisconnecting, setGcalDisconnecting] = useState(false);
+  const [gcalLastSyncAt, setGcalLastSyncAt] = useState<string | null>(null);
+  const gcalOAuthInProgress = useRef(false);
 
-  const checkGcalStatus = useCallback(async () => {
+  // Check status and auto-sync if connected but never synced
+  const checkGcalStatus = useCallback(async (opts?: { autoSync?: boolean }) => {
     if (!userId) return;
+    const shouldAutoSync = opts?.autoSync ?? false;
     try {
       const res = await api(`/api/public/google-calendar/status?userId=${userId}`);
       const data = await res.json();
-      setGcalConnected(data?.connected === true);
+      console.log("[GCal Status]", JSON.stringify(data));
+      const isConnected = data?.connected === true;
+      setGcalConnected(isConnected);
+      setGcalLastSyncAt(data?.lastSyncAt ?? null);
+
+      // Auto-sync: connected but never synced (lastSyncAt is null/undefined)
+      if (shouldAutoSync && isConnected && !data?.lastSyncAt) {
+        console.log("[GCal] Connected but never synced — triggering auto-sync");
+        setGcalSyncing(true);
+        try {
+          await api("/api/public/google-calendar/midwife-sync", {
+            method: "POST",
+            body: JSON.stringify({ userId }),
+          });
+          setGcalLastSyncAt(new Date().toISOString());
+        } catch {
+          // sync failed silently — calendar is still connected
+        } finally {
+          setGcalSyncing(false);
+        }
+      }
     } catch {
       // ignore
     } finally {
@@ -45,8 +70,23 @@ export default function ProfileScreen() {
     }
   }, [userId]);
 
+  // Initial status check on mount
   useEffect(() => {
     checkGcalStatus();
+  }, [checkGcalStatus]);
+
+  // When app returns to foreground during OAuth, dismiss browser and check status
+  useEffect(() => {
+    const sub = AppState.addEventListener("change", (nextState) => {
+      if (nextState === "active" && gcalOAuthInProgress.current) {
+        gcalOAuthInProgress.current = false;
+        // Dismiss the in-app browser if still open
+        WebBrowser.dismissAuthSession();
+        // Check status with auto-sync enabled
+        checkGcalStatus({ autoSync: true });
+      }
+    });
+    return () => sub.remove();
   }, [checkGcalStatus]);
 
   const handleGcalConnect = useCallback(async () => {
@@ -60,14 +100,16 @@ export default function ProfileScreen() {
         return;
       }
 
-      // 2. Open the OAuth flow — redirectUrl matches what callback sends back
+      // 2. Open the OAuth flow
+      gcalOAuthInProgress.current = true;
       const redirectUrl = ExpoLinking.createURL("gcal-callback");
       const result = await WebBrowser.openAuthSessionAsync(data.authUrl, redirectUrl);
+      gcalOAuthInProgress.current = false;
 
       if (result.type === "success" && result.url) {
         const parsed = ExpoLinking.parse(result.url);
         if (parsed.queryParams?.gcal === "connected") {
-          // 3. Trigger bulk sync
+          // Redirect was caught — trigger sync directly
           setGcalConnected(true);
           setGcalSyncing(true);
           try {
@@ -75,6 +117,7 @@ export default function ProfileScreen() {
               method: "POST",
               body: JSON.stringify({ userId }),
             });
+            setGcalLastSyncAt(new Date().toISOString());
           } catch {
             // sync failed silently — calendar is still connected
           } finally {
@@ -85,10 +128,30 @@ export default function ProfileScreen() {
         } else if (parsed.queryParams?.gcal === "error") {
           Alert.alert("Fehler", "Verbindung mit Google Kalender fehlgeschlagen.");
         }
+      } else {
+        // Browser was dismissed (user swiped back, or AppState listener closed it).
+        // Status check + auto-sync already handled by the AppState listener.
       }
     } catch (err) {
+      gcalOAuthInProgress.current = false;
       console.error("GCal connect error:", err);
       Alert.alert("Fehler", "Verbindung mit Google Kalender fehlgeschlagen.");
+    }
+  }, [userId]);
+
+  const handleGcalManualSync = useCallback(async () => {
+    if (!userId) return;
+    setGcalSyncing(true);
+    try {
+      await api("/api/public/google-calendar/midwife-sync", {
+        method: "POST",
+        body: JSON.stringify({ userId }),
+      });
+      setGcalLastSyncAt(new Date().toISOString());
+    } catch {
+      Alert.alert("Fehler", "Synchronisierung fehlgeschlagen.");
+    } finally {
+      setGcalSyncing(false);
     }
   }, [userId]);
 
@@ -291,6 +354,12 @@ export default function ProfileScreen() {
                   <Ionicons name="checkmark-circle" size={20} color={COLORS.success} />
                   <Text style={gcalStyles.connectedText}>Google Kalender verbunden</Text>
                 </View>
+                {!gcalLastSyncAt && (
+                  <TouchableOpacity style={gcalStyles.syncBtn} onPress={handleGcalManualSync}>
+                    <Ionicons name="sync-outline" size={18} color={COLORS.buttonPrimaryText} />
+                    <Text style={gcalStyles.syncBtnText}>Jetzt synchronisieren</Text>
+                  </TouchableOpacity>
+                )}
                 <TouchableOpacity style={gcalStyles.disconnectBtn} onPress={handleGcalDisconnect}>
                   <Ionicons name="close-circle-outline" size={18} color={COLORS.error} />
                   <Text style={gcalStyles.disconnectText}>Verbindung trennen</Text>
@@ -546,5 +615,20 @@ const gcalStyles = StyleSheet.create({
     color: COLORS.buttonPrimaryText,
     fontWeight: "700",
     fontSize: 15,
+  },
+  syncBtn: {
+    backgroundColor: COLORS.primary,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: SPACING.sm,
+    paddingVertical: SPACING.sm,
+    borderRadius: BORDER_RADIUS.md,
+    marginTop: SPACING.sm,
+  },
+  syncBtnText: {
+    color: COLORS.buttonPrimaryText,
+    fontWeight: "700",
+    fontSize: 14,
   },
 });
