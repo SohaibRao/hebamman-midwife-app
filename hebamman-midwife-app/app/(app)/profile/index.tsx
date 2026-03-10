@@ -1,5 +1,5 @@
 // app/(app)/profile/index.tsx
-import React, { useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   View,
   Text,
@@ -9,17 +9,117 @@ import {
   TouchableOpacity,
   Linking,
   FlatList,
+  ActivityIndicator,
+  Alert,
 } from "react-native";
 import { Image } from "expo-image";
 import * as WebBrowser from "expo-web-browser";
+import * as ExpoLinking from "expo-linking";
 import { useAuth } from "@/context/AuthContext";
 import { useMidwifeProfile, MidwifeProfile } from "@/hooks/useMidwifeProfile";
 import { COLORS, SPACING, BORDER_RADIUS } from "@/constants/theme";
 import de from "@/constants/i18n";
+import { api } from "@/lib/api";
+import { Ionicons } from "@expo/vector-icons";
 
 export default function ProfileScreen() {
   const { user } = useAuth();
   const userId = user?.id ?? process.env.EXPO_PUBLIC_MIDWIFE_ID ?? null;
+
+  // --- Google Calendar state ---
+  const [gcalConnected, setGcalConnected] = useState(false);
+  const [gcalLoading, setGcalLoading] = useState(true);
+  const [gcalSyncing, setGcalSyncing] = useState(false);
+  const [gcalDisconnecting, setGcalDisconnecting] = useState(false);
+
+  const checkGcalStatus = useCallback(async () => {
+    if (!userId) return;
+    try {
+      const res = await api(`/api/public/google-calendar/status?userId=${userId}`);
+      const data = await res.json();
+      setGcalConnected(data?.connected === true);
+    } catch {
+      // ignore
+    } finally {
+      setGcalLoading(false);
+    }
+  }, [userId]);
+
+  useEffect(() => {
+    checkGcalStatus();
+  }, [checkGcalStatus]);
+
+  const handleGcalConnect = useCallback(async () => {
+    if (!userId) return;
+    try {
+      // 1. Get the auth URL from Project A
+      const res = await api(`/api/public/google-calendar/auth?userId=${userId}&role=midwife`);
+      const data = await res.json();
+      if (!data?.authUrl) {
+        Alert.alert("Fehler", "Authentifizierungs-URL konnte nicht generiert werden.");
+        return;
+      }
+
+      // 2. Open the OAuth flow — redirectUrl matches what callback sends back
+      const redirectUrl = ExpoLinking.createURL("gcal-callback");
+      const result = await WebBrowser.openAuthSessionAsync(data.authUrl, redirectUrl);
+
+      if (result.type === "success" && result.url) {
+        const parsed = ExpoLinking.parse(result.url);
+        if (parsed.queryParams?.gcal === "connected") {
+          // 3. Trigger bulk sync
+          setGcalConnected(true);
+          setGcalSyncing(true);
+          try {
+            await api("/api/public/google-calendar/midwife-sync", {
+              method: "POST",
+              body: JSON.stringify({ userId }),
+            });
+          } catch {
+            // sync failed silently — calendar is still connected
+          } finally {
+            setGcalSyncing(false);
+          }
+        } else if (parsed.queryParams?.gcal === "denied") {
+          Alert.alert("Abgebrochen", "Google Kalender Zugriff wurde verweigert.");
+        } else if (parsed.queryParams?.gcal === "error") {
+          Alert.alert("Fehler", "Verbindung mit Google Kalender fehlgeschlagen.");
+        }
+      }
+    } catch (err) {
+      console.error("GCal connect error:", err);
+      Alert.alert("Fehler", "Verbindung mit Google Kalender fehlgeschlagen.");
+    }
+  }, [userId]);
+
+  const handleGcalDisconnect = useCallback(async () => {
+    if (!userId) return;
+    Alert.alert(
+      "Google Kalender trennen",
+      "Alle synchronisierten Termine werden aus Ihrem Google Kalender entfernt. Fortfahren?",
+      [
+        { text: "Abbrechen", style: "cancel" },
+        {
+          text: "Trennen",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              setGcalDisconnecting(true);
+              await api("/api/public/google-calendar/disconnect", {
+                method: "POST",
+                body: JSON.stringify({ userId }),
+              });
+              setGcalConnected(false);
+            } catch {
+              Alert.alert("Fehler", "Trennung fehlgeschlagen.");
+            } finally {
+              setGcalDisconnecting(false);
+            }
+          },
+        },
+      ]
+    );
+  }, [userId]);
   const { data, status, error, refresh } = useMidwifeProfile(userId);
 
   const fullName = useMemo(() => {
@@ -168,6 +268,43 @@ export default function ProfileScreen() {
           )}
         </Card>
       )}
+
+      {/* Google Calendar */}
+      <Card title="Google Kalender">
+        {gcalLoading ? (
+          <ActivityIndicator size="small" color={COLORS.primary} />
+        ) : gcalSyncing ? (
+          <View style={gcalStyles.statusRow}>
+            <ActivityIndicator size="small" color={COLORS.primary} style={{ marginRight: SPACING.sm }} />
+            <Text style={gcalStyles.syncingText}>Synchronisiere Termine...</Text>
+          </View>
+        ) : gcalConnected ? (
+          <View>
+            {gcalDisconnecting ? (
+              <View style={gcalStyles.statusRow}>
+                <ActivityIndicator size="small" color={COLORS.error} style={{ marginRight: SPACING.sm }} />
+                <Text style={gcalStyles.disconnectingText}>Wird getrennt...</Text>
+              </View>
+            ) : (
+              <>
+                <View style={gcalStyles.connectedRow}>
+                  <Ionicons name="checkmark-circle" size={20} color={COLORS.success} />
+                  <Text style={gcalStyles.connectedText}>Google Kalender verbunden</Text>
+                </View>
+                <TouchableOpacity style={gcalStyles.disconnectBtn} onPress={handleGcalDisconnect}>
+                  <Ionicons name="close-circle-outline" size={18} color={COLORS.error} />
+                  <Text style={gcalStyles.disconnectText}>Verbindung trennen</Text>
+                </TouchableOpacity>
+              </>
+            )}
+          </View>
+        ) : (
+          <TouchableOpacity style={gcalStyles.connectBtn} onPress={handleGcalConnect}>
+            <Ionicons name="calendar-outline" size={20} color={COLORS.buttonPrimaryText} />
+            <Text style={gcalStyles.connectText}>Mit Google Kalender verbinden</Text>
+          </TouchableOpacity>
+        )}
+      </Card>
 
       {/* Testimonials (horizontal) */}
       {testimonials.length > 0 && (
@@ -357,4 +494,57 @@ const styles = StyleSheet.create({
   testimonialImg: { width: 48, height: 48, borderRadius: 24, marginBottom: SPACING.xs, backgroundColor: "#eee" },
   testimonialName: { fontWeight: "800", color: COLORS.text },
   testimonialRole: { color: COLORS.textSecondary, fontSize: 12, marginBottom: SPACING.xs },
+});
+
+const gcalStyles = StyleSheet.create({
+  statusRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: SPACING.sm,
+  },
+  syncingText: {
+    color: COLORS.textSecondary,
+    fontWeight: "600",
+  },
+  disconnectingText: {
+    color: COLORS.error,
+    fontWeight: "600",
+  },
+  connectedRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: SPACING.sm,
+    paddingVertical: SPACING.sm,
+  },
+  connectedText: {
+    color: COLORS.success,
+    fontWeight: "700",
+    fontSize: 15,
+  },
+  disconnectBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: SPACING.xs,
+    marginTop: SPACING.sm,
+    paddingVertical: SPACING.sm,
+  },
+  disconnectText: {
+    color: COLORS.error,
+    fontWeight: "600",
+    fontSize: 14,
+  },
+  connectBtn: {
+    backgroundColor: COLORS.buttonPrimary,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: SPACING.sm,
+    paddingVertical: SPACING.md,
+    borderRadius: BORDER_RADIUS.md,
+  },
+  connectText: {
+    color: COLORS.buttonPrimaryText,
+    fontWeight: "700",
+    fontSize: 15,
+  },
 });
