@@ -1,5 +1,6 @@
 import { Stack } from "expo-router";
 import { useAuth } from "@/context/AuthContext";
+import { useNotifications } from "@/context/NotificationContext";
 import { Redirect, useRouter } from "expo-router";
 import { TouchableOpacity, Text, View, StyleSheet, Modal, ScrollView } from "react-native";
 import { useState } from "react";
@@ -70,6 +71,28 @@ function MenuButton() {
   );
 }
 
+function NotificationBell() {
+  const { unreadCount } = useNotifications();
+  const router = useRouter();
+
+  return (
+    <View style={{ marginRight: 15, paddingTop: 8, paddingRight: 4 }}>
+      <TouchableOpacity
+        onPress={() => router.push("/(app)/notifications" as any)}
+      >
+        <Ionicons name="notifications-outline" size={24} color="white" />
+      </TouchableOpacity>
+      {unreadCount > 0 && (
+        <View style={styles.badge} pointerEvents="none">
+          <Text style={styles.badgeText}>
+            {unreadCount > 99 ? "99+" : unreadCount}
+          </Text>
+        </View>
+      )}
+    </View>
+  );
+}
+
 function MenuItem({ icon, label, onPress }: { icon: keyof typeof Ionicons.glyphMap; label: string; onPress: () => void }) {
   return (
     <TouchableOpacity style={styles.menuItem} onPress={onPress}>
@@ -93,6 +116,7 @@ export default function AppLayout() {
         headerTintColor: "white",
         headerTitleStyle: { fontWeight: "700" },
         headerLeft: () => <MenuButton />,
+        headerRight: () => <NotificationBell />,
       }}
     >
       <Stack.Screen
@@ -130,6 +154,10 @@ export default function AppLayout() {
       <Stack.Screen
         name="private-services/index"
         options={{ title: de.privateServices.title }}
+      />
+      <Stack.Screen
+        name="notifications/index"
+        options={{ title: de.dashboard.notifications }}
       />
     </Stack>
   );
@@ -212,5 +240,25 @@ const styles = StyleSheet.create({
     color: "white",
     fontWeight: "700",
     fontSize: 16,
+  },
+  badge: {
+    position: "absolute",
+    top: -4,
+    right: -6,
+    backgroundColor: "#EF4444",
+    borderRadius: 10,
+    minWidth: 18,
+    height: 18,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 4,
+    borderWidth: 1.5,
+    borderColor: COLORS.primary,
+  },
+  badgeText: {
+    color: "white",
+    fontSize: 10,
+    fontWeight: "700",
+    lineHeight: 13,
   },
 });
